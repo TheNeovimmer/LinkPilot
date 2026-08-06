@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { urlField } from '../utils/url.js';
 
 /** Structured fields extracted from a pasted job posting (URL or raw text). */
 export const importJobSchema = z.object({
@@ -8,13 +9,13 @@ export const importJobSchema = z.object({
   remote: z.boolean().default(false),
   salaryMin: z.number().int().nonnegative().nullable().optional(),
   salaryMax: z.number().int().nonnegative().nullable().optional(),
-  url: z.string().url().nullable().optional(),
+  url: urlField.nullable(),
   description: z.string().nullable().optional(),
 });
 
 export type ImportJob = z.infer<typeof importJobSchema>;
 
-export function buildImportJobMessages(input: { text: string }): { role: 'system' | 'user'; content: string }[] {
+export function buildImportJobMessages(input: { text: string; url?: string }): { role: 'system' | 'user'; content: string }[] {
   return [
     {
       role: 'system',
@@ -25,12 +26,12 @@ export function buildImportJobMessages(input: { text: string }): { role: 'system
         '- companyName: the hiring company. null if unknown.',
         '- location: city/region. Use "Remote" only if fully remote; otherwise null if unknown.',
         '- remote: true only when the posting explicitly says remote/hybrid.',
-        '- salaryMin/salaryMax: numeric yearly salary in USD if stated. null if not.',
+        '- salaryMin/salaryMax: numeric salary range if the posting states one, in the currency as given (no conversion). null if not stated.',,
         '- url: the posting URL if present in the text; otherwise null.',
         '- description: keep the full job description text, cleaned of navigation/boilerplate. null if none.',
         'Respond with JSON only.',
       ].join('\n'),
     },
-    { role: 'user', content: input.text },
+    { role: 'user', content: [input.url ? `Job URL: ${input.url}` : '', input.text].filter(Boolean).join('\n\n') },
   ];
 }

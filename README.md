@@ -42,6 +42,8 @@ npm run db:seed       # optional demo dataset
 npm run dev           # backend :4000 + frontend :5173
 ```
 
+Importing job **links** uses a headless browser as a fallback for JS-rendered pages. If your OS doesn't already have Chromium/Chrome and you want that fallback, install it once: `npx playwright install chromium`.
+
 Open **http://localhost:5173** — sign in with the seeded account
 `demo@linkpilot.app` / `linkpilot-demo-1234`, or create your own.
 
@@ -113,6 +115,7 @@ src/modules/
 - **Account lifecycle:** change password (`/api/auth/change-password`, signs out other sessions) and delete account (cascades through every owned row) from Settings.
 - **Activity log:** every mutation is recorded (`/activity` in the UI) with action/entity filters and pagination.
 - **Uploads:** avatars are sniffed by magic bytes (raster-only — no SVG/XSS), size-capped, and old files are removed on replace.
+- **Job import from a link:** pasting a URL into Import fetches the posting server-side (plain HTTP first, headless browser fallback for JS-rendered pages) and the AI extracts title/company/salary/description from the real content. Sites behind hard bot walls (aggressive Cloudflare/Turnstile) return a clear error — paste the description text instead.
 - **Auth:** Better Auth session cookie; the web client calls `/api/auth/*` directly and `/api/v1/*` via axios with `withCredentials`.
 - **AI streaming:** SSE from `/api/v1/ai/*` — `{ type: "delta" | "done" | "error" }` events; client aborts on disconnect.
 - **Workers:** `node-cron` turns due reminders into notifications + realtime push every minute.

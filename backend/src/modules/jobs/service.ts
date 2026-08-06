@@ -6,6 +6,7 @@ import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
 import { prisma } from '../../database/prisma.js';
 import { buildImportJobMessages, importJobSchema, type ImportJob } from '../../prompts/importJob.js';
+import { fetchJobContent, isLikelyUrl, normalizeUrl } from '../../utils/job-fetch.js';
 import type { JobDTO } from './types.js';
 import { JobRepository } from './repository.js';
 
@@ -73,8 +74,17 @@ export class JobService {
   async importFromText(userId: string, text: string): Promise<JobDTO> {
     if (!aiClient.isConfigured()) throw ApiError.aiNotConfigured();
 
+    // URLs are fetched server-side (plain HTTP, headless browser as fallback)
+    // so the model sees the real posting, not just the link.
+    let source = text;
+    let url: string | undefined;
+    if (isLikelyUrl(text)) {
+      url = normalizeUrl(text);
+      source = await fetchJobContent(url);
+    }
+
     const extracted = await aiClient.chatJSON<ImportJob>({
-      messages: buildImportJobMessages({ text }),
+      messages: buildImportJobMessages({ text: source, url }),
       schema: importJobSchema,
     });
     if (!extracted.title) throw ApiError.badRequest('Could not extract a job title from that text');
@@ -96,7 +106,7 @@ export class JobService {
     const job = await this.repo.create(userId, {
       title: extracted.title,
       companyId: companyId ?? undefined,
-      url: extracted.url ?? undefined,
+      url: extracted.url ?? url, // fall back to the pasted link when the model returns none
       description: extracted.description ?? undefined,
       location: extracted.location ?? undefined,
       remote: extracted.remote,

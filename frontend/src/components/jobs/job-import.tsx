@@ -15,7 +15,7 @@ export function JobImportDialog({ open, onOpenChange }: { open: boolean; onOpenC
 
   const importJob = useMutation({
     mutationFn: async (): Promise<Job> => {
-      const res = await api.post('/jobs/import', { text });
+      const res = await api.post('/jobs/import', { text }, { timeout: 90_000 }); // slow: URL fetch + AI
       return res.data.data as Job;
     },
     onSuccess: (job) => {
