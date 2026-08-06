@@ -11,10 +11,12 @@ import { DashboardPage } from '@/pages/dashboard';
 import { ConversationsPage } from '@/pages/conversations';
 import { JobsPage } from '@/pages/jobs';
 import { RecruitersPage } from '@/pages/recruiters';
+import { CompaniesPage } from '@/pages/companies';
 import { ApplicationsPage } from '@/pages/applications';
 import { InterviewsPage } from '@/pages/interviews';
 import { NotesPage } from '@/pages/notes';
 import { RemindersPage } from '@/pages/reminders';
+import { ActivityPage } from '@/pages/activity';
 import { SettingsPage } from '@/pages/settings';
 import { NotFoundPage } from '@/pages/not-found';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -64,10 +66,12 @@ export default function App() {
             <Route path="/conversations/:id" element={<ConversationsPage />} />
             <Route path="/jobs" element={<JobsPage />} />
             <Route path="/recruiters" element={<RecruitersPage />} />
+            <Route path="/companies" element={<CompaniesPage />} />
             <Route path="/applications" element={<ApplicationsPage />} />
             <Route path="/interviews" element={<InterviewsPage />} />
             <Route path="/notes" element={<NotesPage />} />
             <Route path="/reminders" element={<RemindersPage />} />
+            <Route path="/activity" element={<ActivityPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { urlFieldNullable } from '../../utils/url.js';
 
 export const updateProfileSchema = z.object({
   displayName: z.string().trim().max(120).optional(),
   title: z.string().trim().max(200).optional().nullable(),
   location: z.string().trim().max(120).optional().nullable(),
-  linkedinUrl: z.string().url().optional().nullable().or(z.literal('').transform(() => null)),
+  linkedinUrl: urlFieldNullable,
   tone: z.enum(['professional', 'casual', 'confident', 'concise']).optional(),
   goals: z
     .object({

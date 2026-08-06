@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { Briefcase, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
+import { Briefcase, Check, Import as ImportIcon, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,12 +13,14 @@ import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { JOB_STATUS_META, StatusBadge } from '@/components/common/status-badge';
 import { JobFormDialog } from '@/components/jobs/job-form';
 import { JobAnalyzeDialog } from '@/components/jobs/job-analyze';
+import { JobImportDialog } from '@/components/jobs/job-import';
 import { cn } from '@/lib/utils';
 import { formatSalary, timeAgo } from '@/lib/format';
 import { toast } from 'sonner';
 import type { Job } from '@/types';
 
 const STATUS_TABS = ['', 'WATCHLIST', 'APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'CLOSED'] as const;
+const BULK_TARGETS = ['APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'CLOSED'] as const;
 
 export function JobsPage() {
   const [searchParams] = useSearchParams();
@@ -30,6 +32,9 @@ export function JobsPage() {
   const [editing, setEditing] = useState<Job | null>(null);
   const [analyzing, setAnalyzing] = useState<Job | null>(null);
   const [deleting, setDeleting] = useState<Job | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState<(typeof BULK_TARGETS)[number]>('APPLIED');
 
   const { data, isLoading } = useQuery({
     queryKey: ['jobs', { q, status, semantic }],
@@ -54,16 +59,41 @@ export function JobsPage() {
     onError: (err) => toast.error(apiErrorMessage(err)),
   });
 
+  const bulkMove = useMutation({
+    mutationFn: async ({ ids, status: s }: { ids: string[]; status: string }) => api.patch('/jobs/bulk', { ids, status: s }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      toast.success(`Moved ${selected.size} job${selected.size === 1 ? '' : 's'} to ${JOB_STATUS_META[bulkStatus]?.label ?? bulkStatus}`);
+      setSelected(new Set());
+    },
+    onError: (err) => toast.error(apiErrorMessage(err)),
+  });
+
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Jobs"
         description="Track roles, analyze fit, and keep the pipeline moving."
         actions={
-          <Button onClick={() => setFormOpen(true)}>
-            <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Add job
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+              <ImportIcon className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Import from URL
+            </Button>
+            <Button onClick={() => setFormOpen(true)}>
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Add job
+            </Button>
+          </div>
         }
       />
 
@@ -108,6 +138,31 @@ export function JobsPage() {
         ))}
       </div>
 
+      {/* Bulk action bar */}
+      {selected.size > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-accent-border/60 bg-accent-muted/40 px-3 py-2">
+          <span className="font-mono text-[12px] text-accent">{selected.size} selected</span>
+          <span className="text-text-muted">→</span>
+          <select
+            value={bulkStatus}
+            onChange={(e) => setBulkStatus(e.target.value as (typeof BULK_TARGETS)[number])}
+            className="h-8 rounded-[var(--radius-control)] border border-border bg-surface-2 px-2 text-[12.5px] text-text focus:border-accent-border focus:outline-none"
+          >
+            {BULK_TARGETS.map((s) => (
+              <option key={s} value={s}>
+                {JOB_STATUS_META[s]?.label ?? s}
+              </option>
+            ))}
+          </select>
+          <Button size="sm" disabled={bulkMove.isPending} onClick={() => bulkMove.mutate({ ids: [...selected], status: bulkStatus })}>
+            {bulkMove.isPending ? 'Moving…' : 'Apply'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+            Clear
+          </Button>
+        </div>
+      ) : null}
+
       {/* Table */}
       {isLoading ? (
         <div className="space-y-2">
@@ -120,6 +175,16 @@ export function JobsPage() {
           <div className="divide-y divide-border/60 bg-[#0c0c0f]">
             {data.items.map((job) => (
               <div key={job.id} className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-2/40">
+                <button
+                  onClick={() => toggleSelect(job.id)}
+                  className={cn(
+                    'flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors cursor-pointer',
+                    selected.has(job.id) ? 'border-accent bg-accent text-accent-ink' : 'border-border-strong hover:border-accent-border',
+                  )}
+                  title="Select"
+                >
+                  {selected.has(job.id) ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                </button>
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-surface-2 ring-1 ring-border">
                   <Briefcase className="h-4 w-4 text-text-secondary" strokeWidth={1.75} />
                 </div>
@@ -183,6 +248,7 @@ export function JobsPage() {
 
       <JobFormDialog open={formOpen} onOpenChange={(v) => { setFormOpen(v); setEditing(null); }} job={editing} />
       {analyzing ? <JobAnalyzeDialog job={analyzing} onOpenChange={(v) => !v && setAnalyzing(null)} /> : null}
+      <JobImportDialog open={importOpen} onOpenChange={setImportOpen} />
       {deleting ? (
         <ConfirmDialog
           open

@@ -12,6 +12,7 @@ import type { AppNotification } from '@/types';
 const TYPE_DOT: Record<string, string> = {
   REMINDER: 'bg-warning',
   INTERVIEW: 'bg-violet',
+  APPLICATION: 'bg-violet',
   AI: 'bg-accent',
   SYSTEM: 'bg-info',
 };

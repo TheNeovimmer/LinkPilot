@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { urlField } from '../../utils/url.js';
 
 export const companyQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -14,7 +15,7 @@ export const companyIdSchema = z.object({ id: z.string().min(4).max(64) });
 export const createCompanySchema = z.object({
   name: z.string().trim().min(1).max(200),
   industry: z.string().trim().max(100).optional(),
-  website: z.string().url().optional().or(z.literal('').transform(() => undefined)),
+  website: urlField,
   location: z.string().trim().max(200).optional(),
   notes: z.string().trim().max(5000).optional(),
 });

@@ -35,7 +35,37 @@ function startReminderWorker(): void {
   logger.info('Reminder worker started (every minute)');
 }
 
+/** Every minute: notify once per interview scheduled within the next 24h. */
+function startInterviewReminderWorker(): void {
+  cron.schedule('* * * * *', async () => {
+    try {
+      const now = new Date();
+      const horizon = new Date(now.getTime() + 24 * 3_600_000);
+      const interviews = await prisma.interview.findMany({
+        where: { status: 'SCHEDULED', remindedAt: null, scheduledAt: { gte: now, lte: horizon } },
+        select: { id: true, userId: true, title: true, job: { select: { company: { select: { name: true } } } } },
+      });
+
+      for (const interview of interviews) {
+        await notificationService.create({
+          userId: interview.userId,
+          type: 'INTERVIEW',
+          title: `Coming up: ${interview.title}`,
+          body: `Scheduled within the next 24h${interview.job?.company?.name ? ` at ${interview.job.company.name}` : ''}`,
+          data: { interviewId: interview.id },
+        });
+        await prisma.interview.update({ where: { id: interview.id }, data: { remindedAt: now } });
+        await auditService.log(interview.userId, 'interview.reminder', 'interview', interview.id);
+      }
+    } catch (err) {
+      logger.error('Interview reminder worker failed', err);
+    }
+  });
+  logger.info('Interview reminder worker started (every minute)');
+}
+
 export function startWorkers(): void {
   if (process.env.NODE_ENV === 'test') return;
   startReminderWorker();
+  startInterviewReminderWorker();
 }

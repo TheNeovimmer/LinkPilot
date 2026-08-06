@@ -9,6 +9,8 @@ import swaggerUi from 'swagger-ui-express';
 import { toNodeHandler } from 'better-auth/node';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
+import { prisma } from './database/prisma.js';
+import { redis } from './database/redis.js';
 import { requestId } from './middlewares/requestId.js';
 import { apiLimiter } from './middlewares/rateLimit.js';
 import { notFound, errorHandler } from './middlewares/error.js';
@@ -71,9 +73,24 @@ export function createApp(): Express {
   // Auth (Better Auth handles its own routes at /api/auth/*)
   app.use('/api/auth', toNodeHandler(auth));
 
-  // Health
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+  // Health — pings Postgres + Redis so monitoring sees the real state.
+  app.get('/health', async (_req, res) => {
+    try {
+      const [db, cache] = await Promise.all([
+        prisma.$queryRaw`SELECT 1`,
+        redis.ping(),
+      ]);
+      res.json({
+        status: 'ok',
+        db: db ? 'up' : 'down',
+        redis: cache === 'PONG' ? 'up' : 'down',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      logger.error('Health check failed', err);
+      res.status(503).json({ status: 'degraded', uptime: process.uptime(), timestamp: new Date().toISOString() });
+    }
   });
 
   // API v1

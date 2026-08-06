@@ -13,6 +13,20 @@ const include = {
   _count: { select: { applications: true, interviews: true } },
 };
 
+/** Multi-word text search: match any term across title/description/company/location. */
+function textSearch(q: string): Prisma.JobWhereInput {
+  const terms = q.split(/\s+/).map((t) => t.trim()).filter(Boolean);
+  if (terms.length === 0) return {};
+  return {
+    OR: terms.flatMap((term) => [
+      { title: { contains: term, mode: 'insensitive' } },
+      { description: { contains: term, mode: 'insensitive' } },
+      { company: { name: { contains: term, mode: 'insensitive' } } },
+      { location: { contains: term, mode: 'insensitive' } },
+    ]),
+  };
+}
+
 export class JobRepository {
   async list(userId: string, query: ListQuery) {
     const { page, limit } = parsePagination(query);
@@ -21,15 +35,7 @@ export class JobRepository {
       ...(query.status ? { status: query.status } : {}),
       ...(query.companyId ? { companyId: query.companyId } : {}),
       ...(query.remote !== undefined ? { remote: query.remote } : {}),
-      ...(query.q
-        ? {
-            OR: [
-              { title: { contains: query.q, mode: 'insensitive' } },
-              { description: { contains: query.q, mode: 'insensitive' } },
-              { company: { name: { contains: query.q, mode: 'insensitive' } } },
-            ],
-          }
-        : {}),
+      ...(query.q ? textSearch(query.q) : {}),
     };
 
     const rows = await prisma.job.findMany({
@@ -110,6 +116,11 @@ export class JobRepository {
   async remove(userId: string, id: string): Promise<boolean> {
     const result = await prisma.job.deleteMany({ where: { id, userId } });
     return result.count > 0;
+  }
+
+  async bulkUpdate(userId: string, ids: string[], status: JobStatus): Promise<number> {
+    const result = await prisma.job.updateMany({ where: { id: { in: ids }, userId }, data: { status } });
+    return result.count;
   }
 
   async updateAnalysis(userId: string, id: string, fitScore: number, analysis: JobAnalysis): Promise<void> {

@@ -25,3 +25,8 @@ export const createApplicationSchema = z.object({
 export const updateApplicationSchema = createApplicationSchema
   .partial()
   .refine((v) => Object.keys(v).length > 0, { message: 'At least one field required' });
+
+export const bulkApplicationSchema = z.object({
+  ids: z.array(z.string().min(4).max(64)).min(1).max(200),
+  status: z.enum(['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'INTERVIEWING', 'OFFER', 'REJECTED', 'WITHDRAWN']),
+});

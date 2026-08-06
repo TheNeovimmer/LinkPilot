@@ -5,9 +5,11 @@ import {
   Briefcase,
   Send,
   Users,
+  Building2,
   CalendarClock,
   StickyNote,
   Bell,
+  History,
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -20,10 +22,13 @@ const NAV = [
   { to: '/jobs', label: 'Jobs', icon: Briefcase },
   { to: '/applications', label: 'Applications', icon: Send },
   { to: '/recruiters', label: 'Recruiters', icon: Users },
+  { to: '/companies', label: 'Companies', icon: Building2 },
   { to: '/interviews', label: 'Interviews', icon: CalendarClock },
   { to: '/notes', label: 'Notes', icon: StickyNote },
   { to: '/reminders', label: 'Reminders', icon: Bell },
 ];
+
+const SECONDARY_NAV = [{ to: '/activity', label: 'Activity', icon: History }];
 
 export function Sidebar() {
   const user = useSession((s) => s.user);
@@ -66,6 +71,32 @@ export function Sidebar() {
             )}
           </NavLink>
         ))}
+
+        {/* Secondary nav */}
+        <div className="mt-4 space-y-0.5 border-t border-border/60 pt-3">
+          {SECONDARY_NAV.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                cn(
+                  'group flex items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-[7px] text-[13px] font-medium transition-colors',
+                  isActive ? 'bg-surface-2 text-text' : 'text-text-muted hover:bg-surface-2/60 hover:text-text-secondary',
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon
+                    className={cn('h-4 w-4', isActive ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary')}
+                    strokeWidth={1.75}
+                  />
+                  {label}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
       </nav>
 
       {/* Settings + user */}

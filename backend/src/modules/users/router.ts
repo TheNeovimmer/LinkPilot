@@ -13,5 +13,7 @@ router.use(requireAuth);
 router.get('/me', controller.getMe);
 router.patch('/me', validate({ body: updateProfileSchema }), controller.patchMe);
 router.post('/me/avatar', controller.uploadAvatar);
+router.delete('/me', controller.deleteMe);
+router.get('/export', controller.exportData);
 
 export const userRouter = router;

@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { requireAuth } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
 import {
+  bulkUpdateJobSchema,
   createJobSchema,
+  importJobSchema,
   jobIdSchema,
   jobQuerySchema,
   semanticSearchSchema,
@@ -20,6 +22,8 @@ router.use(requireAuth);
 router.get('/', validate({ query: jobQuerySchema }), controller.list);
 router.post('/', validate({ body: createJobSchema }), controller.create);
 router.get('/stats', controller.stats);
+router.post('/import', validate({ body: importJobSchema }), controller.importFromText);
+router.patch('/bulk', validate({ body: bulkUpdateJobSchema }), controller.bulkUpdate);
 router.post('/semantic', validate({ body: semanticSearchSchema }), controller.semantic);
 router.get('/:id', validate({ params: jobIdSchema }), controller.get);
 router.patch('/:id', validate({ params: jobIdSchema, body: updateJobSchema }), controller.update);

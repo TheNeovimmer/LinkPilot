@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { urlField } from '../../utils/url.js';
 
 export const conversationQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -17,7 +18,7 @@ export const conversationIdSchema = z.object({
 
 export const createConversationSchema = z.object({
   contactName: z.string().trim().min(1).max(200),
-  contactLinkedInUrl: z.string().url().optional().or(z.literal('').transform(() => undefined)),
+  contactLinkedInUrl: urlField,
   contactHeadline: z.string().trim().max(300).optional(),
   companyId: z.string().optional(),
   recruiterId: z.string().optional(),

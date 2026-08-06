@@ -2,7 +2,7 @@
 
 A self-hosted, AI-powered **personal LinkedIn assistant** — one user, their job search, no CRM cruft.
 
-Track conversations, jobs, recruiters, applications, interviews, notes and reminders in one place. The AI (any OpenAI-compatible endpoint — OpenCode Zen free models work out of the box) drafts replies in your voice, analyzes job fit, prepares you for interviews, and summarizes conversations.
+Track conversations, jobs, recruiters, companies, applications, interviews, notes and reminders in one place. The AI (any OpenAI-compatible endpoint — OpenCode Zen free models work out of the box) drafts replies in your voice, analyzes job fit, prepares you for interviews, and summarizes conversations.
 
 ```
 frontend  (React 19 · Vite · Tailwind v4 · TanStack Query · Zustand)
@@ -107,9 +107,14 @@ src/modules/
 ```
 
 - **Response envelope:** `{ success, data, meta }` everywhere; errors `{ success, error: { code, message } }`.
+- **Cross-entity logic:** moving an application to `INTERVIEWING`/`OFFER`/etc. syncs the linked job's status and fires a milestone notification; scheduling an interview moves the linked job + application to `INTERVIEWING`, notifies you, and re-arms the 24h reminder when rescheduled.
+- **Workers:** two cron jobs, once a minute — due reminders and interviews within the next 24h become realtime notifications (once each).
+- **Semantic search:** `Job.embedding` is a pgvector `vector(1536)`; embeddings are generated automatically on job create/update when `AI_EMBEDDING_MODEL` is set, and search falls back to a multi-word text match otherwise.
+- **Account lifecycle:** change password (`/api/auth/change-password`, signs out other sessions) and delete account (cascades through every owned row) from Settings.
+- **Activity log:** every mutation is recorded (`/activity` in the UI) with action/entity filters and pagination.
+- **Uploads:** avatars are sniffed by magic bytes (raster-only — no SVG/XSS), size-capped, and old files are removed on replace.
 - **Auth:** Better Auth session cookie; the web client calls `/api/auth/*` directly and `/api/v1/*` via axios with `withCredentials`.
 - **AI streaming:** SSE from `/api/v1/ai/*` — `{ type: "delta" | "done" | "error" }` events; client aborts on disconnect.
-- **Semantic search:** `Job.embedding` is a pgvector `vector(1536)`; without an embedding model the search falls back to a text query.
 - **Workers:** `node-cron` turns due reminders into notifications + realtime push every minute.
 - **CI:** GitHub Actions — install → prisma generate → typecheck → lint → test → build (`.github/workflows/ci.yml`).
 

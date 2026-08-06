@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { urlField } from '../../utils/url.js';
 
 export const recruiterQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -18,7 +19,7 @@ export const createRecruiterSchema = z.object({
   name: z.string().trim().min(1).max(200),
   companyId: z.string().optional(),
   title: z.string().trim().max(200).optional(),
-  linkedinUrl: z.string().url().optional().or(z.literal('').transform(() => undefined)),
+  linkedinUrl: urlField,
   email: z.string().email().optional().or(z.literal('').transform(() => undefined)),
   phone: z.string().trim().max(50).optional(),
   notes: z.string().trim().max(5000).optional(),

@@ -47,4 +47,15 @@ export class JobController {
       ok(res, { items: result.items, mode: 'text' });
     }
   });
+
+  /** POST /import — AI-extract a job from pasted URL/text. */
+  importFromText = asyncHandler(async (req, res) => {
+    created(res, await this.service.importFromText(req.user!.id, req.body.text));
+  });
+
+  /** PATCH /bulk — move many jobs to a status in one call. */
+  bulkUpdate = asyncHandler(async (req, res) => {
+    const { ids, status } = req.body as { ids: string[]; status: string };
+    ok(res, { updated: await this.service.bulkUpdate(req.user!.id, ids, status as never) });
+  });
 }

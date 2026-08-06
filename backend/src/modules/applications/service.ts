@@ -1,8 +1,27 @@
 import { ApiError } from '../../utils/ApiError.js';
 import { auditService } from '../audit/service.js';
 import { cacheDel } from '../../database/redis.js';
+import { notificationService } from '../notifications/service.js';
+import { prisma } from '../../database/prisma.js';
+import type { ApplicationStatus, JobStatus } from '@prisma/client';
 import type { ApplicationDTO } from './types.js';
 import { ApplicationRepository } from './repository.js';
+
+/** Application → linked Job status (null = don't touch the job). */
+const STATUS_TO_JOB: Partial<Record<ApplicationStatus, JobStatus>> = {
+  SUBMITTED: 'APPLIED',
+  UNDER_REVIEW: 'APPLIED',
+  INTERVIEWING: 'INTERVIEWING',
+  OFFER: 'OFFER',
+  REJECTED: 'REJECTED',
+  WITHDRAWN: 'CLOSED',
+};
+
+const MILESTONES: Partial<Record<ApplicationStatus, { title: string }>> = {
+  INTERVIEWING: { title: 'Application is in interviews' },
+  OFFER: { title: 'You received an offer' },
+  REJECTED: { title: 'Application was rejected' },
+};
 
 export class ApplicationService {
   constructor(private readonly repo: ApplicationRepository) {}
@@ -17,19 +36,48 @@ export class ApplicationService {
     return application;
   }
 
+  /** Keep the linked job's status in sync and notify on milestones. */
+  private async applyStatusSideEffects(userId: string, application: ApplicationDTO): Promise<void> {
+    const jobStatus = STATUS_TO_JOB[application.status];
+    if (jobStatus && application.jobId) {
+      await prisma.job.updateMany({ where: { id: application.jobId, userId }, data: { status: jobStatus } });
+      await cacheDel(`dashboard:${userId}`, `jobs:stats:${userId}`);
+    }
+    const milestone = MILESTONES[application.status];
+    if (milestone) {
+      await notificationService.create({
+        userId,
+        type: 'APPLICATION',
+        title: milestone.title,
+        body: application.jobTitle ?? application.roleTitle ?? application.companyName ?? undefined,
+        data: { applicationId: application.id },
+      });
+    }
+  }
+
   async create(userId: string, data: Parameters<ApplicationRepository['create']>[1]): Promise<ApplicationDTO> {
+    // First submitted application auto-records the applied date.
+    if (data.status === 'SUBMITTED' && !data.appliedAt) data.appliedAt = new Date();
     const application = await this.repo.create(userId, data);
+    await this.applyStatusSideEffects(userId, application);
     await cacheDel(`dashboard:${userId}`, `applications:pipeline:${userId}`);
     await auditService.log(userId, 'application.create', 'application', application.id, { status: application.status });
     return application;
   }
 
   async update(userId: string, id: string, data: Parameters<ApplicationRepository['update']>[2]): Promise<ApplicationDTO> {
-    await this.get(userId, id);
+    const current = await this.get(userId, id);
+    const merged = { ...current, ...data };
+    // Auto-set appliedAt when the application first becomes submitted.
+    if (merged.status === 'SUBMITTED' && !merged.appliedAt) data.appliedAt = new Date();
     const updated = await this.repo.update(userId, id, data);
+    const result = updated!;
+    if (result.status !== current.status || result.jobId !== current.jobId) {
+      await this.applyStatusSideEffects(userId, result);
+    }
     await cacheDel(`dashboard:${userId}`, `applications:pipeline:${userId}`);
-    await auditService.log(userId, 'application.update', 'application', id, { status: updated?.status });
-    return updated!;
+    await auditService.log(userId, 'application.update', 'application', id, { status: result.status });
+    return result;
   }
 
   async remove(userId: string, id: string): Promise<void> {
@@ -37,6 +85,25 @@ export class ApplicationService {
     await this.repo.remove(userId, id);
     await cacheDel(`dashboard:${userId}`, `applications:pipeline:${userId}`);
     await auditService.log(userId, 'application.delete', 'application', id);
+  }
+
+  /** Bulk status move — runs the same job-sync + milestone logic per application. */
+  async bulkUpdate(userId: string, ids: string[], status: ApplicationStatus): Promise<number> {
+    let updated = 0;
+    for (const id of ids) {
+      const current = await this.repo.findById(userId, id);
+      if (!current || current.status === status) continue;
+      const data: Parameters<ApplicationRepository['update']>[2] = { status };
+      if (status === 'SUBMITTED' && !current.appliedAt) data.appliedAt = new Date();
+      const result = await this.repo.update(userId, id, data);
+      if (result) {
+        await this.applyStatusSideEffects(userId, result);
+        updated++;
+      }
+    }
+    await cacheDel(`dashboard:${userId}`, `applications:pipeline:${userId}`);
+    await auditService.log(userId, 'application.bulkUpdate', 'application', undefined, { count: updated, status });
+    return updated;
   }
 
   async pipeline(userId: string) {

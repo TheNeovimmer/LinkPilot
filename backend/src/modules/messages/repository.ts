@@ -14,16 +14,18 @@ export class MessageRepository {
     const where: Prisma.MessageWhereInput = {
       conversationId,
       ...(query.role ? { role: query.role } : {}),
+      ...(query.before ? { createdAt: { lt: new Date(query.before) } } : {}),
     };
+    // Newest first so page 1 is the tail of the thread; reversed to ascending for rendering.
     const [rows, total] = await prisma.$transaction([
       prisma.message.findMany({
         where,
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: 'desc' },
         ...prismaTakeSkip({ page, limit }),
       }),
       prisma.message.count({ where }),
     ]);
-    return { items: rows as MessageDTO[], meta: buildMeta({ page, limit }, total) };
+    return { items: (rows.reverse() as MessageDTO[]), meta: buildMeta({ page, limit }, total) };
   }
 
   /** Last N messages (for AI context), oldest first. */

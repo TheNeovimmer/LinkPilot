@@ -280,6 +280,8 @@ model Interview {
   feedback      String?
   /// AI prep: topics, likely questions, tips (JSON).
   prep          Json?
+  /// Set when the 24h-before reminder notification has fired.
+  remindedAt    DateTime?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 

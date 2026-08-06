@@ -173,7 +173,7 @@ export interface Reminder {
   updatedAt: string;
 }
 
-export type NotificationType = 'REMINDER' | 'INTERVIEW' | 'AI' | 'SYSTEM';
+export type NotificationType = 'REMINDER' | 'INTERVIEW' | 'APPLICATION' | 'AI' | 'SYSTEM';
 
 export interface AppNotification {
   id: string;

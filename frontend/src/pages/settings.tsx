@@ -1,12 +1,15 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Camera, Loader2, Save, Sparkles, UserCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Camera, Download, KeyRound, Loader2, Save, Sparkles, Trash2, UserCircle } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/common/field';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { PageHeader } from '@/components/common/page-header';
+import { useSession } from '@/stores/session';
 import { toast } from 'sonner';
 import type { Profile } from '@/types';
 
@@ -19,6 +22,8 @@ const TONES = [
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const logout = useSession((s) => s.logout);
   const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     displayName: '',
@@ -30,6 +35,9 @@ export function SettingsPage() {
     salaryRange: '',
   });
   const [loaded, setLoaded] = useState(false);
+  const [pw, setPw] = useState({ currentPassword: '', newPassword: '', confirm: '' });
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ['profile'],
@@ -88,6 +96,62 @@ export function SettingsPage() {
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const changePassword = useMutation({
+    mutationFn: async () => {
+      if (pw.newPassword.length < 8) throw new Error('New password must be at least 8 characters');
+      if (pw.newPassword !== pw.confirm) throw new Error('New passwords do not match');
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ currentPassword: pw.currentPassword, newPassword: pw.newPassword }),
+      });
+      if (!res.ok) {
+        let message = `Request failed (${res.status})`;
+        try {
+          const body = (await res.json()) as { message?: string };
+          if (body.message) message = body.message;
+        } catch {
+          /* keep fallback */
+        }
+        throw new Error(message);
+      }
+    },
+    onSuccess: () => {
+      setPw({ currentPassword: '', newPassword: '', confirm: '' });
+      setPwError(null);
+      toast.success('Password changed — other sessions were signed out');
+    },
+    onError: (err) => setPwError(apiErrorMessage(err)),
+  });
+
+  const deleteAccount = useMutation({
+    mutationFn: async () => api.delete('/users/me'),
+    onSuccess: async () => {
+      await logout();
+      navigate('/login', { replace: true });
+      toast.success('Account deleted. Good luck out there.');
+    },
+    onError: (err) => toast.error(apiErrorMessage(err)),
+  });
+
+  const exportData = async () => {
+    try {
+      const res = await fetch('/api/v1/users/export', { credentials: 'include' });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `linkpilot-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Export downloaded — everything is in the JSON file');
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
+  };
 
   return (
     <div className="flex max-w-2xl flex-col gap-5">
@@ -197,6 +261,81 @@ export function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-accent" strokeWidth={1.75} />
+            Change password
+          </CardTitle>
+          <CardDescription>Changing your password signs out every other session.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Current password">
+              <Input type="password" value={pw.currentPassword} onChange={(e) => setPw((p) => ({ ...p, currentPassword: e.target.value }))} placeholder="••••••••" />
+            </Field>
+            <Field label="New password">
+              <Input type="password" value={pw.newPassword} onChange={(e) => setPw((p) => ({ ...p, newPassword: e.target.value }))} placeholder="At least 8 characters" />
+            </Field>
+            <Field label="Confirm new password">
+              <Input type="password" value={pw.confirm} onChange={(e) => setPw((p) => ({ ...p, confirm: e.target.value }))} placeholder="Repeat it" />
+            </Field>
+          </div>
+          {pwError ? <p className="text-[12.5px] text-destructive">{pwError}</p> : null}
+          <div className="flex justify-end border-t border-border pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => changePassword.mutate()}
+              disabled={changePassword.isPending || !pw.currentPassword || !pw.newPassword}
+            >
+              {changePassword.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} /> : <KeyRound className="h-3.5 w-3.5" strokeWidth={1.75} />}
+              Update password
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-4 w-4 text-accent" strokeWidth={1.75} />
+            Your data
+          </CardTitle>
+          <CardDescription>Self-hosted means your data is your only copy — back it up regularly.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between border-t border-border pt-4">
+          <p className="text-[12.5px] text-text-muted">Full JSON export of every conversation, job, note, reminder and setting.</p>
+          <Button variant="secondary" onClick={exportData}>
+            <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+            Export data
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+            Danger zone
+          </CardTitle>
+          <CardDescription>Permanently deletes your account, profile, and every conversation, job, note and reminder.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-end border-t border-border pt-4">
+          <Button variant="destructive" onClick={() => setConfirmDelete(true)} disabled={deleteAccount.isPending}>
+            {deleteAccount.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} /> : <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />}
+            Delete account
+          </Button>
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete your account?"
+        description="This wipes everything — conversations, jobs, applications, notes, reminders and your AI profile. This cannot be undone."
+        confirmLabel="Delete forever"
+        onConfirm={() => deleteAccount.mutate()}
+      />
     </div>
   );
 }

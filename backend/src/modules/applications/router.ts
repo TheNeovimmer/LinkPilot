@@ -4,6 +4,7 @@ import { validate } from '../../middlewares/validate.js';
 import {
   applicationIdSchema,
   applicationQuerySchema,
+  bulkApplicationSchema,
   createApplicationSchema,
   updateApplicationSchema,
 } from './schema.js';
@@ -32,6 +33,10 @@ const controller = {
   update: asyncHandler(async (req, res) => {
     ok(res, await service.update(req.user!.id, req.params.id, req.body));
   }),
+  bulkUpdate: asyncHandler(async (req, res) => {
+    const { ids, status } = req.body as { ids: string[]; status: string };
+    ok(res, { updated: await service.bulkUpdate(req.user!.id, ids, status as never) });
+  }),
   remove: asyncHandler(async (req, res) => {
     await service.remove(req.user!.id, req.params.id);
     noContent(res);
@@ -43,6 +48,7 @@ router.use(requireAuth);
 router.get('/', validate({ query: applicationQuerySchema }), controller.list);
 router.get('/pipeline', controller.pipeline);
 router.post('/', validate({ body: createApplicationSchema }), controller.create);
+router.patch('/bulk', validate({ body: bulkApplicationSchema }), controller.bulkUpdate);
 router.get('/:id', validate({ params: applicationIdSchema }), controller.get);
 router.patch('/:id', validate({ params: applicationIdSchema, body: updateApplicationSchema }), controller.update);
 router.delete('/:id', validate({ params: applicationIdSchema }), controller.remove);

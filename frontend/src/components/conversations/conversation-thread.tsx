@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, FileText, Pencil, Sparkles, Trash2 } from 'lucide-react';
@@ -46,11 +46,39 @@ export function ConversationThread({ conversation, onEdit, onDeleted }: Conversa
   const [summarizing, setSummarizing] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: messages, isLoading } = useQuery({
-    queryKey: ['messages', conversation.id],
-    queryFn: async () =>
-      (await api.get(`/conversations/${conversation.id}/messages`, { params: { limit: 200 } })).data.data as Message[],
+  // Cursor pagination: newest 100 first, older chunks prepended on demand.
+  const [chunks, setChunks] = useState<{ cursor: string | null; items: Message[] }[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['messages', conversation.id, cursor ?? 'latest'],
+    queryFn: async () => {
+      const res = await api.get(`/conversations/${conversation.id}/messages`, {
+        params: { limit: 100, before: cursor ?? undefined },
+      });
+      return { items: res.data.data as Message[], total: (res.data.meta as { total: number } | undefined)?.total ?? res.data.items.length };
+    },
+    enabled: !!conversation.id,
   });
+
+  // Accumulate chunks in fetch order (newest → older); the response is already ascending within a chunk.
+  useEffect(() => {
+    if (!data) return;
+    setChunks((prev) => (prev.some((c) => c.cursor === cursor) ? prev : [...prev, { cursor, items: data.items }]));
+  }, [data, cursor]);
+
+  useEffect(() => {
+    setChunks([]);
+    setCursor(null);
+  }, [conversation.id]);
+
+  const messages = chunks.flatMap((c) => c.items);
+  const loaded = messages.length;
+  const hasMore = data ? loaded < data.total : false;
+  const loadEarlier = () => {
+    const oldest = chunks.at(-1)?.items[0];
+    if (oldest) setCursor(oldest.createdAt);
+  };
 
   const summarize = async () => {
     setSummarizing(true);
@@ -122,6 +150,14 @@ export function ConversationThread({ conversation, onEdit, onDeleted }: Conversa
 
       {/* Messages */}
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {hasMore ? (
+          <button
+            onClick={loadEarlier}
+            className="mx-auto flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-border bg-surface-2/60 py-2 text-[12px] text-text-muted transition-colors hover:border-accent-border hover:text-text cursor-pointer"
+          >
+            Load earlier messages ({data ? data.total - loaded : 0} more)
+          </button>
+        ) : null}
         {isLoading ? (
           <div className="space-y-3">
             <Skeleton className="ml-auto h-14 w-2/3 rounded-[var(--radius-card)]" />

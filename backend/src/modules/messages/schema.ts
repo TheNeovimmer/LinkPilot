@@ -9,6 +9,8 @@ export const messageListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   role: z.enum(['ME', 'THEM', 'AI']).optional(),
+  /** Load messages older than this timestamp (cursor for "load earlier"). */
+  before: z.string().datetime().optional(),
 });
 
 export const createMessageSchema = z.object({

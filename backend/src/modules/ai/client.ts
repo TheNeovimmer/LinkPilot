@@ -1,4 +1,4 @@
-import type { ZodType } from 'zod';
+import { z } from 'zod';
 import { env } from '../../config/env.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { extractJson } from '../../utils/ai-json.js';
@@ -90,7 +90,7 @@ export class AiClient {
   }
 
   /** Non-streaming structured JSON completion, zod-validated, with one retry. */
-  async chatJSON<T>(opts: { messages: ChatMessage[]; schema: ZodType<T>; tools?: ToolDef[] }): Promise<T> {
+  async chatJSON<T>(opts: { messages: ChatMessage[]; schema: z.ZodType<T, z.ZodTypeDef, any>; tools?: ToolDef[] }): Promise<T> {
     const { messages, schema, tools } = opts;
     const attempt = async (withFormat: boolean): Promise<string> => {
       const body: Record<string, unknown> = {
