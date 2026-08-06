@@ -1,0 +1,253 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "LinkPilot API",
+    "version": "1.0.0",
+    "description": "AI-powered personal LinkedIn career assistant. Single-user REST API. All endpoints (except /auth) require a Better Auth session cookie. Responses use the envelope { success, data, meta? }."
+  },
+  "servers": [{ "url": "/api/v1", "description": "LinkPilot API v1" }],
+  "paths": {
+    "/auth/session": {
+      "get": {
+        "summary": "Current session (user or null)",
+        "responses": { "200": { "description": "Session or null" } }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "summary": "Own profile (auto-created on first access)",
+        "responses": { "200": { "description": "Profile" } }
+      },
+      "patch": {
+        "summary": "Update profile (name, title, tone, goals, preferences)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": { "type": "string" },
+                  "title": { "type": ["string", "null"] },
+                  "tone": { "type": "string", "enum": ["professional", "casual", "confident", "concise"] },
+                  "goals": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated profile" } }
+      }
+    },
+    "/users/me/avatar": {
+      "post": {
+        "summary": "Upload avatar image (multipart field: file)",
+        "requestBody": {
+          "required": true,
+          "content": { "multipart/form-data": { "schema": { "type": "object", "properties": { "file": { "type": "string", "format": "binary" } } } } }
+        },
+        "responses": { "200": { "description": "Updated profile with image URL" } }
+      }
+    },
+    "/conversations": {
+      "get": {
+        "summary": "List conversations (search, filter by status/recruiter/company, sort, paginate)",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20, "maximum": 100 } },
+          { "name": "q", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["ACTIVE", "ARCHIVED"] } }
+        ],
+        "responses": { "200": { "description": "Paginated conversations" } }
+      },
+      "post": {
+        "summary": "Create a conversation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["contactName"],
+                "properties": {
+                  "contactName": { "type": "string" },
+                  "contactLinkedInUrl": { "type": "string", "format": "uri" },
+                  "contactHeadline": { "type": "string" },
+                  "companyId": { "type": "string" },
+                  "recruiterId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created conversation" } }
+      }
+    },
+    "/conversations/{id}": {
+      "get": { "summary": "Get conversation", "responses": { "200": { "description": "Conversation" }, "404": { "description": "Not found" } } },
+      "patch": { "summary": "Update conversation", "responses": { "200": { "description": "Updated" } } },
+      "delete": { "summary": "Delete conversation", "responses": { "204": { "description": "Deleted" } } }
+    },
+    "/conversations/{conversationId}/messages": {
+      "get": { "summary": "List messages (oldest first)", "responses": { "200": { "description": "Paginated messages" } } },
+      "post": {
+        "summary": "Add a message (role: ME or THEM)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["role", "content"], "properties": { "role": { "type": "string", "enum": ["ME", "THEM"] }, "content": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Created message" } }
+      }
+    },
+    "/recruiters": {
+      "get": {
+        "summary": "List recruiters (pipeline filtering, search)",
+        "responses": { "200": { "description": "Paginated recruiters" } }
+      },
+      "post": { "summary": "Create recruiter", "responses": { "201": { "description": "Created" } } }
+    },
+    "/recruiters/pipeline": {
+      "get": { "summary": "Recruiter pipeline stats by status", "responses": { "200": { "description": "Stats" } } }
+    },
+    "/companies": {
+      "get": { "summary": "List companies", "responses": { "200": { "description": "Paginated companies" } } },
+      "post": { "summary": "Create company", "responses": { "201": { "description": "Created" } } }
+    },
+    "/companies/all": {
+      "get": { "summary": "All companies (id + name) for dropdowns", "responses": { "200": { "description": "List" } } }
+    },
+    "/jobs": {
+      "get": {
+        "summary": "List jobs (search, status/company/remote filters, sort by fitScore/salary)",
+        "responses": { "200": { "description": "Paginated jobs" } }
+      },
+      "post": { "summary": "Create job", "responses": { "201": { "description": "Created" } } }
+    },
+    "/jobs/stats": {
+      "get": { "summary": "Job pipeline stats (by status, avg fit score)", "responses": { "200": { "description": "Stats" } } }
+    },
+    "/jobs/semantic": {
+      "post": {
+        "summary": "Semantic job search via embeddings (falls back to text search)",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["q"], "properties": { "q": { "type": "string" }, "limit": { "type": "integer", "default": 10 } } } } }
+        },
+        "responses": { "200": { "description": "Jobs with match mode" } }
+      }
+    },
+    "/applications": {
+      "get": { "summary": "List applications", "responses": { "200": { "description": "Paginated applications" } } },
+      "post": { "summary": "Create application", "responses": { "201": { "description": "Created" } } }
+    },
+    "/applications/pipeline": {
+      "get": { "summary": "Application pipeline stats", "responses": { "200": { "description": "Stats" } } }
+    },
+    "/interviews": {
+      "get": { "summary": "List interviews (status/mode/date-range filters)", "responses": { "200": { "description": "Paginated interviews" } } },
+      "post": { "summary": "Create interview", "responses": { "201": { "description": "Created" } } }
+    },
+    "/interviews/upcoming": {
+      "get": { "summary": "Upcoming scheduled interviews (next 14 days)", "responses": { "200": { "description": "List" } } }
+    },
+    "/notes": {
+      "get": { "summary": "List notes (pinned first, tag filter, search)", "responses": { "200": { "description": "Paginated notes" } } },
+      "post": { "summary": "Create note", "responses": { "201": { "description": "Created" } } }
+    },
+    "/notes/tags": {
+      "get": { "summary": "All note tags ranked by usage", "responses": { "200": { "description": "Tags" } } }
+    },
+    "/reminders": {
+      "get": { "summary": "List reminders", "responses": { "200": { "description": "Paginated reminders" } } },
+      "post": { "summary": "Create reminder (cron turns due ones into notifications)", "responses": { "201": { "description": "Created" } } }
+    },
+    "/notifications": {
+      "get": { "summary": "List notifications (unread filter)", "responses": { "200": { "description": "Paginated notifications" } } }
+    },
+    "/notifications/unread-count": {
+      "get": { "summary": "Unread notification count", "responses": { "200": { "description": "{ count }" } } }
+    },
+    "/notifications/read-all": {
+      "post": { "summary": "Mark all notifications read", "responses": { "200": { "description": "{ marked }" } } }
+    },
+    "/ai/draft-reply": {
+      "post": {
+        "summary": "Stream a drafted reply for a conversation (SSE)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["conversationId"], "properties": { "conversationId": { "type": "string" }, "extraContext": { "type": "string" }, "tone": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "text/event-stream with {type: delta|done|error} events"
+          },
+          "503": { "description": "AI not configured" }
+        }
+      }
+    },
+    "/ai/rewrite": {
+      "post": {
+        "summary": "Stream a rewritten version of an existing draft (SSE)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["text"], "properties": { "text": { "type": "string" }, "tone": { "type": "string" }, "instruction": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": { "200": { "description": "SSE stream" } }
+      }
+    },
+    "/ai/analyze-job": {
+      "post": {
+        "summary": "Analyze a job: fit score, strengths, gaps, questions (persisted to the job)",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["jobId"], "properties": { "jobId": { "type": "string" } } } } }
+        },
+        "responses": { "200": { "description": "JobAnalysis" } }
+      }
+    },
+    "/ai/interview-prep": {
+      "post": {
+        "summary": "Generate interview prep: topics, likely questions, tips (persisted)",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["interviewId"], "properties": { "interviewId": { "type": "string" } } } } }
+        },
+        "responses": { "200": { "description": "InterviewPrep" } }
+      }
+    },
+    "/ai/summarize": {
+      "post": {
+        "summary": "Summarize a conversation",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["conversationId"], "properties": { "conversationId": { "type": "string" } } } } }
+        },
+        "responses": { "200": { "description": "ConversationSummary" } }
+      }
+    },
+    "/audit-logs": {
+      "get": {
+        "summary": "List audit logs (action/entity/date filters)",
+        "responses": { "200": { "description": "Paginated audit logs" } }
+      }
+    },
+    "/dashboard/stats": {
+      "get": {
+        "summary": "Dashboard overview (cached 30s)",
+        "responses": { "200": { "description": "DashboardStats" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+# deps
+node_modules/
+
+# builds
+dist/
+build/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# data / uploads
+uploads/
+*.sqlite
+*.db
+
+# logs
+*.log
+logs/
+
+# coverage / test
+coverage/
+*.tsbuildinfo
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/

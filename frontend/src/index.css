@@ -1,0 +1,154 @@
+@import 'tailwindcss';
+
+/*
+ * LinkPilot design tokens.
+ * Dark-only product (Cursor-style). One accent: emerald. One radius rule:
+ * controls 8px, cards 12px, overlays 16px. Geist + Geist Mono.
+ */
+:root {
+  --background: #0a0a0c;
+  --surface: #101013;
+  --surface-2: #17171b;
+  --surface-3: #1e1e24;
+  --border: #232329;
+  --border-strong: #32323b;
+  --text: #ededef;
+  --text-secondary: #a3a3ad;
+  --text-muted: #6f6f7a;
+  --accent: #3ddc97;
+  --accent-strong: #29c886;
+  --accent-ink: #06140e;
+  --accent-muted: rgba(61, 220, 151, 0.1);
+  --accent-border: rgba(61, 220, 151, 0.32);
+  --destructive: #f2646e;
+  --destructive-muted: rgba(242, 100, 110, 0.1);
+  --warning: #e8b34b;
+  --warning-muted: rgba(232, 179, 75, 0.1);
+  --info: #5aa7ff;
+  --info-muted: rgba(90, 167, 255, 0.1);
+  --violet: #a78bfa;
+  --violet-muted: rgba(167, 139, 250, 0.1);
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-overlay: 16px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-violet: var(--violet);
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', monospace;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-overlay: 16px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-background text-text font-sans antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+::selection {
+  background: var(--accent-muted);
+  color: var(--text);
+}
+
+/* Thin, quiet scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Focus ring: one system-wide, always visible */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* Accent pulse (AI activity) */
+@keyframes lp-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+.lp-pulse {
+  animation: lp-pulse 1.1s ease-in-out infinite;
+}
+
+/* Streaming caret */
+@keyframes lp-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.lp-caret::after {
+  content: '▍';
+  color: var(--accent);
+  animation: lp-blink 0.9s steps(1) infinite;
+  margin-left: 1px;
+}
+
+/* Skeleton shimmer */
+@keyframes lp-shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.lp-skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 37%, var(--surface-2) 63%);
+  background-size: 800px 100%;
+  animation: lp-shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-pulse,
+  .lp-caret::after,
+  .lp-skeleton {
+    animation: none;
+  }
+}

@@ -1,0 +1,122 @@
+# LinkPilot
+
+A self-hosted, AI-powered **personal LinkedIn assistant** — one user, their job search, no CRM cruft.
+
+Track conversations, jobs, recruiters, applications, interviews, notes and reminders in one place. The AI (any OpenAI-compatible endpoint — OpenCode Zen free models work out of the box) drafts replies in your voice, analyzes job fit, prepares you for interviews, and summarizes conversations.
+
+```
+frontend  (React 19 · Vite · Tailwind v4 · TanStack Query · Zustand)
+backend   (Express 5 · TypeScript · Prisma + PostgreSQL/pgvector · Redis · Better Auth · Socket.IO)
+docker    (Dockerfiles + nginx for production; dev runs natively)
+```
+
+---
+
+## Quick start (local dev)
+
+**1. Start Postgres (with pgvector) and Redis.** Docker works fine — they are just services:
+
+```bash
+docker run -d --name linkpilot-pg -p 5432:5432 -e POSTGRES_USER=linkpilot \
+  -e POSTGRES_PASSWORD=linkpilot -e POSTGRES_DB=linkpilot pgvector/pgvector:pg16
+docker run -d --name linkpilot-redis -p 6379:6379 redis:7
+```
+
+> Already have a Postgres container? Install pgvector into it: `docker exec <name> sh -c "apt-get update && apt-get install -y postgresql-18-pgvector"` (postgres 18) then `docker exec <name> psql -U postgres -c "ALTER ROLE linkpilot SUPERUSER CREATEDB;"` — the migration creates the `vector` extension.
+
+**2. Configure the backend:**
+
+```bash
+cp backend/.env.example backend/.env   # or create backend/.env
+# fill in AI_API_KEY to unlock AI features (OpenCode Zen: https://opencode.ai/zen)
+```
+
+Defaults already point at `localhost:5432` / `localhost:6379` and an OpenCode Zen endpoint (`AI_BASE_URL=https://opencode.ai/zen/v1`, `AI_MODEL=deepseek-v4-flash-free`).
+
+**3. Install, migrate, seed, run:**
+
+```bash
+npm install
+npm run db:migrate    # creates the schema (pgvector included)
+npm run db:seed       # optional demo dataset
+npm run dev           # backend :4000 + frontend :5173
+```
+
+Open **http://localhost:5173** — sign in with the seeded account
+`demo@linkpilot.app` / `linkpilot-demo-1234`, or create your own.
+
+API docs (Swagger): http://localhost:4000/docs
+
+---
+
+## AI setup
+
+LinkPilot speaks any OpenAI-compatible chat API. Set in `backend/.env`:
+
+| Variable            | Default                                | Notes                                  |
+| ------------------- | -------------------------------------- | -------------------------------------- |
+| `AI_BASE_URL`       | `https://opencode.ai/zen/v1`           | OpenAI-compatible base URL             |
+| `AI_API_KEY`        | *(unset)*                              | Unset → AI features disabled gracefully|
+| `AI_MODEL`          | `deepseek-v4-flash-free`               | Free OpenCode Zen model                |
+| `AI_EMBEDDING_MODEL`| *(unset)*                              | Set e.g. `text-embedding-3-small` for vector semantic job search; text fallback otherwise |
+
+Without a key the app runs fully — AI buttons surface a clear "not configured" state.
+
+---
+
+## Scripts
+
+| Command                  | What it does                                  |
+| ------------------------ | --------------------------------------------- |
+| `npm run dev`            | Backend + frontend dev servers                |
+| `npm run dev:backend`    | API only (tsx watch, :4000)                   |
+| `npm run dev:frontend`   | Web only (Vite, :5173, proxies /api → :4000)  |
+| `npm run build`          | Type-check + build both workspaces            |
+| `npm run typecheck`      | `tsc --noEmit` both workspaces                |
+| `npm run lint`           | ESLint (backend) + tsc (frontend)             |
+| `npm test`               | Backend unit tests (vitest)                   |
+| `npm run db:migrate`     | Prisma migrate dev                            |
+| `npm run db:seed`        | Idempotent demo dataset                       |
+| `npm run db:studio`      | Prisma Studio                                 |
+
+Production: `docker compose up --build` (backend + nginx serving the built frontend; edit `AI_API_KEY` under `backend.environment` first).
+
+---
+
+## Architecture
+
+Modular monorepo — each module is a self-contained `controller → service → repository` stack with zod validation and typed DTOs:
+
+```
+src/modules/
+  auth          Better Auth (email/password) at /api/auth, session middleware
+  users         profile + avatar upload (multer) — the AI context
+  conversations  contact tracking + message threads
+  messages      thread messages (ME / THEM / AI roles)
+  recruiters    people pipeline
+  companies     orgs
+  jobs          roles + pgvector semantic search + AI fit analysis
+  applications  application pipeline
+  interviews    calendar + AI prep
+  notes         free-form notes with tags
+  reminders     due notifications (cron worker every minute)
+  notifications Socket.IO realtime push + in-app inbox
+  ai            streaming SSE endpoints: draft-reply, rewrite, summarize, analyze-job, interview-prep
+  audit         immutable audit log
+  dashboard     Redis-cached stats
+```
+
+- **Response envelope:** `{ success, data, meta }` everywhere; errors `{ success, error: { code, message } }`.
+- **Auth:** Better Auth session cookie; the web client calls `/api/auth/*` directly and `/api/v1/*` via axios with `withCredentials`.
+- **AI streaming:** SSE from `/api/v1/ai/*` — `{ type: "delta" | "done" | "error" }` events; client aborts on disconnect.
+- **Semantic search:** `Job.embedding` is a pgvector `vector(1536)`; without an embedding model the search falls back to a text query.
+- **Workers:** `node-cron` turns due reminders into notifications + realtime push every minute.
+- **CI:** GitHub Actions — install → prisma generate → typecheck → lint → test → build (`.github/workflows/ci.yml`).
+
+## Tests
+
+Backend unit tests cover the fiddly bits: pagination helpers, JSON extraction from model output, and prompt construction (`backend/tests/`). Run with `npm test`.
+
+## License
+
+MIT — private by default: every record is scoped to the single owner user. No third-party analytics, no tracking.
