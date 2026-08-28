@@ -60,13 +60,8 @@ export class AttachmentService {
     const attachment = await this.repo.remove(userId, id);
     if (!attachment) throw ApiError.notFound('Attachment not found');
     // Best-effort cleanup of the underlying file (never throws on IO errors).
-    const { default: fs } = await import('node:fs');
-    const { default: path } = await import('node:path');
-    const { env } = await import('@/config/env');
-    const abs = path.resolve(env.UPLOAD_DIR, path.basename(attachment.url));
-    if (abs.startsWith(path.resolve(env.UPLOAD_DIR))) {
-      fs.unlink(abs, () => {});
-    }
+    const { removeUpload } = await import('@/lib/storage');
+    removeUpload(attachment.url);
     await auditService.log(userId, 'attachment.delete', 'attachment', id);
   }
 }

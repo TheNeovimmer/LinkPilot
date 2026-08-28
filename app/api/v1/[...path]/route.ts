@@ -187,11 +187,10 @@ async function handleUsers(req: Request, method: string, path: string[], user: A
 }
 
 async function handleAvatar(req: Request, user: AuthUser): Promise<Response> {
-  const { default: fs } = await import('node:fs');
-  const { default: path } = await import('node:path');
   const { default: crypto } = await import('node:crypto');
+  const { extname } = await import('node:path');
   const { default: multer } = await import('multer');
-  const { env } = await import('@/config/env');
+  const { ensureUploadDir, writeUpload, removeUpload } = await import('@/lib/storage');
   const { ApiError } = await import('@/utils/ApiError');
 
   const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
@@ -203,17 +202,15 @@ async function handleAvatar(req: Request, user: AuthUser): Promise<Response> {
   const buf = Buffer.from(await file.arrayBuffer());
   if (!sniffImage(buf, file.type)) throw ApiError.badRequest('File is not a valid image');
 
-  fs.mkdirSync(env.UPLOAD_DIR, { recursive: true });
-  const ext = path.extname(file.name).toLowerCase() || '.png';
+  ensureUploadDir();
+  const ext = extname(file.name).toLowerCase() || '.png';
   const filename = `${crypto.randomUUID()}${ext}`;
-  fs.writeFileSync(path.join(env.UPLOAD_DIR, filename), buf);
+  writeUpload(filename, buf);
 
   const url = `/uploads/${filename}`;
   const profile = await userService.updateAvatar(user.id, url);
   if (profile.image && profile.image !== url) {
-    const old = path.resolve(env.UPLOAD_DIR, path.basename(profile.image));
-    const uploadsRoot = path.resolve(env.UPLOAD_DIR);
-    if (old.startsWith(uploadsRoot)) fs.unlink(old, () => {});
+    removeUpload(profile.image);
   }
   // static serving handled by route/rewrite — placeholder for uploads URL
   void multer;
@@ -236,8 +233,9 @@ async function handleAttachments(req: Request, m: string, id: string | undefined
     const { default: fs } = await import('node:fs');
     const { default: path } = await import('node:path');
     const { default: crypto } = await import('node:crypto');
-    const { env } = await import('@/config/env');
+    const { extname } = await import('node:path');
     const { isAttachmentKind } = await import('@/modules/attachments/types');
+    const { ensureUploadDir, writeUpload, removeUpload } = await import('@/lib/storage');
 
     const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
     const form = await req.formData();
@@ -252,11 +250,11 @@ async function handleAttachments(req: Request, m: string, id: string | undefined
     const kind = isAttachmentKind(kindRaw) ? kindRaw : 'other';
 
     const buf = Buffer.from(await file.arrayBuffer());
-    fs.mkdirSync(env.UPLOAD_DIR, { recursive: true });
-    const ext = path.extname(file.name).toLowerCase() || '.bin';
+    ensureUploadDir();
+    const ext = extname(file.name).toLowerCase() || '.bin';
     const filename = `${crypto.randomUUID()}${ext}`;
     const url = `/uploads/${filename}`;
-    fs.writeFileSync(path.join(env.UPLOAD_DIR, filename), buf);
+    writeUpload(filename, buf);
 
     try {
       const attachment = await attachmentService.create(user.id, {
@@ -272,7 +270,7 @@ async function handleAttachments(req: Request, m: string, id: string | undefined
       return created(attachment);
     } catch (err) {
       // Roll back the file if the DB write failed so orphans don't accumulate.
-      fs.unlink(path.join(env.UPLOAD_DIR, filename), () => {});
+      removeUpload(filename);
       throw err;
     }
   }
