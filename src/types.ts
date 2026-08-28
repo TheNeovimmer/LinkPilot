@@ -185,6 +185,18 @@ export interface Reminder {
 
 export type NotificationType = 'REMINDER' | 'INTERVIEW' | 'APPLICATION' | 'AI' | 'SYSTEM';
 
+export interface Attachment {
+  id: string;
+  applicationId: string | null;
+  noteId: string | null;
+  kind: 'resume' | 'coverLetter' | 'contract' | 'other';
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  createdAt: string;
+}
+
 export interface AppNotification {
   id: string;
   type: NotificationType;

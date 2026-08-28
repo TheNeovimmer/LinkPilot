@@ -17,16 +17,31 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-  profile       Profile?
+  id               String     @id @default(cuid())
+  name             String?
+  email            String     @unique
+  emailVerified    Boolean    @default(false)
+  image            String?
+  twoFactorEnabled Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  accounts         Account[]
+  sessions         Session[]
+  profile          Profile?
+  twoFactor        TwoFactor?
+}
+
+model TwoFactor {
+  id                      String    @id @default(cuid())
+  secret                  String
+  backupCodes             String
+  userId                  String    @unique
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 }
 
 model Account {
@@ -268,6 +283,7 @@ model Application {
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
   interviews      Interview[]
+  attachments     Attachment[]
 
   @@index([userId, status])
   @@index([userId, appliedAt])
@@ -315,16 +331,38 @@ model Interview {
 }
 
 model Note {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String
-  content   String?
-  pinned    Boolean  @default(false)
-  tags      String[] @default([])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String       @id @default(cuid())
+  userId      String
+  title       String
+  content     String?
+  pinned      Boolean      @default(false)
+  tags        String[]     @default([])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  attachments Attachment[]
 
   @@index([userId, pinned])
+}
+
+model Attachment {
+  id            String       @id @default(cuid())
+  userId        String
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  noteId        String?
+  note          Note?        @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  /// resume | coverLetter | contract | other
+  kind          String
+  filename      String
+  originalName  String
+  mimeType      String
+  size          Int
+  url           String
+  createdAt     DateTime     @default(now())
+
+  @@index([userId])
+  @@index([applicationId])
+  @@index([noteId])
 }
 
 model Reminder {

@@ -1,7 +1,11 @@
 import { handle, requireUser, ok, created, noContent, rawJson, sseResponse, type AuthUser } from '@/server/http';
+import { ApiError } from '@/utils/ApiError';
 import { getAiClient, getAiSettingsView, writeAiSettings } from '@/modules/ai/config';
 import type { AiService } from '@/modules/ai/service';
 import { AiService as AiServiceImpl } from '@/modules/ai/service';
+
+import { AttachmentService } from '@/modules/attachments/service';
+import { AttachmentRepository } from '@/modules/attachments/repository';
 
 import { ApplicationService } from '@/modules/applications/service';
 import { ApplicationRepository } from '@/modules/applications/repository';
@@ -104,6 +108,7 @@ const recruiterService = new RecruiterService(new RecruiterRepository());
 const reminderService = new ReminderService(new ReminderRepository());
 const userService = new UserService(new ProfileRepository());
 const dashboardService = new DashboardService();
+const attachmentService = new AttachmentService(new AttachmentRepository());
 
 const convRepo = new ConversationRepository();
 const msgRepo = new MessageRepository();
@@ -213,6 +218,65 @@ async function handleAvatar(req: Request, user: AuthUser): Promise<Response> {
   // static serving handled by route/rewrite — placeholder for uploads URL
   void multer;
   return ok(profile);
+}
+
+// Attachments : upload / list / delete (multipart, stored under UPLOAD_DIR).
+async function handleAttachments(req: Request, m: string, id: string | undefined, user: AuthUser): Promise<Response> {
+  if (m === 'GET') {
+    const q = new URL(req.url).searchParams;
+    const applicationId = q.get('applicationId') || null;
+    const noteId = q.get('noteId') || null;
+    return ok(await attachmentService.list(user.id, applicationId, noteId));
+  }
+  if (m === 'DELETE' && id) {
+    await attachmentService.remove(user.id, id);
+    return noContent();
+  }
+  if (m === 'POST' && !id) {
+    const { default: fs } = await import('node:fs');
+    const { default: path } = await import('node:path');
+    const { default: crypto } = await import('node:crypto');
+    const { env } = await import('@/config/env');
+    const { isAttachmentKind } = await import('@/modules/attachments/types');
+
+    const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
+    const form = await req.formData();
+    const file = form.get('file');
+    if (!(file instanceof File)) throw ApiError.badRequest('No file uploaded');
+    if (file.size < 1) throw ApiError.badRequest('Empty file');
+    if (file.size > MAX_SIZE) throw ApiError.badRequest('File exceeds 20MB');
+
+    const applicationId = (form.get('applicationId') as string | null) ?? null;
+    const noteId = (form.get('noteId') as string | null) ?? null;
+    const kindRaw = (form.get('kind') as string | null) ?? 'other';
+    const kind = isAttachmentKind(kindRaw) ? kindRaw : 'other';
+
+    const buf = Buffer.from(await file.arrayBuffer());
+    fs.mkdirSync(env.UPLOAD_DIR, { recursive: true });
+    const ext = path.extname(file.name).toLowerCase() || '.bin';
+    const filename = `${crypto.randomUUID()}${ext}`;
+    const url = `/uploads/${filename}`;
+    fs.writeFileSync(path.join(env.UPLOAD_DIR, filename), buf);
+
+    try {
+      const attachment = await attachmentService.create(user.id, {
+        applicationId,
+        noteId,
+        kind,
+        filename,
+        originalName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        size: buf.byteLength,
+        url,
+      });
+      return created(attachment);
+    } catch (err) {
+      // Roll back the file if the DB write failed so orphans don't accumulate.
+      fs.unlink(path.join(env.UPLOAD_DIR, filename), () => {});
+      throw err;
+    }
+  }
+  throw new Error(`Not found: ${m} /attachments`);
 }
 
 function sniffImage(buf: Buffer, mimetype: string): boolean {
@@ -480,6 +544,8 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
     }
     case 'ai':
       return handleAi(req, m, rest[0], user);
+    case 'attachments':
+      return handleAttachments(req, m, rest[0], user);
     default:
       throw new Error(`Not found: ${resource}`);
   }

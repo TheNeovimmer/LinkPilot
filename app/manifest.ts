@@ -1,0 +1,21 @@
+import type { MetadataRoute } from 'next';
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'LinkPilot',
+    short_name: 'LinkPilot',
+    description: 'Your private AI career copilot',
+    start_url: '/dashboard',
+    display: 'standalone',
+    background_color: '#0a0a0c',
+    theme_color: '#0a0a0c',
+    orientation: 'portrait-primary',
+    icons: [
+      { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },
+      { src: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+    ],
+  };
+}

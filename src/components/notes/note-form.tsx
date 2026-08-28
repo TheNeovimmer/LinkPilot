@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field } from '@/components/common/field';
+import { AttachmentList } from '@/components/attachments/attachment-list';
 import { toast } from 'sonner';
 import type { Note } from '@/types';
 
@@ -96,6 +97,7 @@ export function NoteFormDialog({
             <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} className="h-4 w-4 rounded border-border bg-surface-2 accent-accent" />
             Pin to top
           </label>
+          {isEdit ? <AttachmentList entity="note" id={note?.id ?? null} /> : null}
           <DialogFooter className="mt-2">
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
               Cancel

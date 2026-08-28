@@ -46,7 +46,6 @@ export const messages: Messages = {
   'login.submit.signIn': 'Sign in',
   'login.submit.signUp': 'Create account',
   'login.privacy': 'Single-user workspace. Your data stays in your own database.',
-  'login.demoHint': 'Demo? Seed the database ({cmd}) then use',
   'login.signingIn': '…',
 
   // Dashboard

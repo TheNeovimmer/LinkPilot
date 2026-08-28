@@ -38,7 +38,6 @@ export const messages: Messages = {
   'login.submit.signIn': 'Se connecter',
   'login.submit.signUp': 'Créer un compte',
   'login.privacy': 'Espace de travail mono-utilisateur. Vos données restent dans votre base.',
-  'login.demoHint': 'Démo ? Initialisez la base ({cmd}) puis utilisez',
   'login.signingIn': '…',
 
   'dashboard.overview': 'Aperçu',

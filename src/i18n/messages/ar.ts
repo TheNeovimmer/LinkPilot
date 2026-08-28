@@ -38,7 +38,6 @@ export const messages: Messages = {
   'login.submit.signIn': 'تسجيل الدخول',
   'login.submit.signUp': 'إنشاء حساب',
   'login.privacy': 'مساحة عمل لشخص واحد. بياناتك تبقى في قاعدة بياناتك.',
-  'login.demoHint': 'تجربة؟ قم بتهيئة قاعدة البيانات ({cmd}) ثم استخدم',
   'login.signingIn': '…',
 
   'dashboard.overview': 'نظرة عامة',

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { Attachment } from '@/types';
 
 /** Authenticated API client for /api/v1 (Better Auth cookie rides along). */
 export const api = axios.create({
@@ -45,6 +46,7 @@ export interface SessionUser {
   email: string;
   name?: string | null;
   image?: string | null;
+  twoFactorEnabled?: boolean;
 }
 
 export async function getSession(): Promise<SessionUser | null> {
@@ -53,17 +55,83 @@ export async function getSession(): Promise<SessionUser | null> {
   return json.success ? (json.data?.user ?? null) : null;
 }
 
-export async function signIn(email: string, password: string): Promise<void> {
+export interface SignInResult {
+  /** true when the account has 2FA and a OTP/TOTP code must be sent for step two. */
+  twoFactorRequired: boolean;
+}
+
+export async function signIn(email: string, password: string): Promise<SignInResult> {
   const res = await fetch('/api/auth/sign-in/email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
     credentials: 'include',
   });
+  const body = (await res.json().catch(() => null)) as {
+    message?: string;
+    twoFactorRedirect?: boolean;
+  } | null;
+  if (!res.ok) throw new Error(body?.message ?? 'Sign-in failed');
+  return { twoFactorRequired: Boolean(body?.twoFactorRedirect) };
+}
+
+export async function verifyTwoFactor(code: string): Promise<void> {
+  const res = await fetch('/api/auth/two-factor/verify-totp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+    credentials: 'include',
+  });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(body?.message ?? 'Sign-in failed');
+    throw new Error(body?.message ?? 'Invalid code');
   }
+}
+
+// --- Two-factor (Settings) ---
+
+export interface TwoFactorSetup {
+  totpURI: string;
+  backupCodes: string[];
+}
+
+async function authFetch(path: string, body: Record<string, string>): Promise<Record<string, unknown>> {
+  const res = await fetch(`/api/auth${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    credentials: 'include',
+  });
+  const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!res.ok) throw new Error((json?.message as string) ?? 'Request failed');
+  return json ?? {};
+}
+
+/** Start TOTP setup — returns the OTP URI (for an authenticator app) + one-time backup codes. */
+export async function enableTwoFactor(password: string): Promise<TwoFactorSetup> {
+  const json = await authFetch('/two-factor/enable', { password, method: 'totp' });
+  const data = (json.data ?? json) as { totpURI?: string; backupCodes?: string[] };
+  return {
+    totpURI: data.totpURI ?? '',
+    backupCodes: data.backupCodes ?? [],
+  };
+}
+
+/** Verify the code from the authenticator to finish enabling 2FA. */
+export async function verifyTwoFactorSetup(code: string): Promise<void> {
+  await authFetch('/two-factor/verify-totp', { code });
+}
+
+/** Turn 2FA off (password required). */
+export async function disableTwoFactor(password: string): Promise<void> {
+  await authFetch('/two-factor/disable', { password });
+}
+
+/** Generate a fresh set of backup codes. */
+export async function regenerateBackupCodes(): Promise<string[]> {
+  const json = await authFetch('/two-factor/regenerate-backup-codes', {});
+  const data = (json.data ?? json) as { backupCodes?: string[] };
+  return data.backupCodes ?? [];
 }
 
 export async function signUp(name: string, email: string, password: string): Promise<void> {
@@ -113,4 +181,33 @@ export async function getAiSettings(): Promise<AiSettingsView> {
 export async function saveAiSettings(patch: AiSettingsPatch): Promise<AiSettingsView> {
   const res = await api.put('/ai/settings', patch);
   return unwrap(res);
+}
+
+// ---------------------------------------------------------------------------
+// Attachments
+// ---------------------------------------------------------------------------
+
+export async function listAttachments(entity: 'application' | 'note', id: string | null): Promise<Attachment[]> {
+  if (!id) return [];
+  const params: Record<string, string> = entity === 'application' ? { applicationId: id } : { noteId: id };
+  const res = await api.get('/attachments', { params });
+  return unwrap(res);
+}
+
+export async function uploadAttachment(
+  entity: 'application' | 'note',
+  id: string,
+  kind: string,
+  file: File,
+): Promise<Attachment> {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('kind', kind);
+  fd.append(entity === 'application' ? 'applicationId' : 'noteId', id);
+  const res = await api.post('/attachments', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  return unwrap(res);
+}
+
+export async function deleteAttachment(id: string): Promise<void> {
+  await api.delete(`/attachments/${id}`);
 }

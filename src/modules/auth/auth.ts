@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { twoFactor } from 'better-auth/plugins';
 import { prisma } from '../../database/prisma';
 import { env } from '../../config/env';
 
@@ -31,4 +32,13 @@ export const auth = betterAuth({
     window: 60,
     max: 20,
   },
+  plugins: [
+    twoFactor({
+      issuer: 'LinkPilot',
+      totpOptions: {
+        period: 30,
+        digits: 6,
+      },
+    }),
+  ],
 });

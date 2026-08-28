@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import type { Profile } from '@/types';
 import { PreferencesCard } from '@/components/settings/preferences-card';
 import { AiProviderCard } from '@/components/settings/ai-provider-card';
+import { TwoFactorCard } from '@/components/settings/two-factor-card';
 
 const TONES = [
   { value: 'professional', label: 'Professional' },
@@ -284,6 +285,8 @@ export function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <TwoFactorCard />
 
       <Card>
         <CardHeader>

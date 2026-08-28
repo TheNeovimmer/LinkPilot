@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field } from '@/components/common/field';
+import { AttachmentList } from '@/components/attachments/attachment-list';
 import { toast } from 'sonner';
 import type { Application } from '@/types';
 
@@ -188,6 +189,8 @@ export function ApplicationFormDialog({
               <option value="Other">Other</option>
             </select>
           </Field>
+
+          {isEdit ? <AttachmentList entity="application" id={application?.id ?? null} /> : null}
 
           {status === 'OFFER' ? (
             <div className="rounded-[var(--radius-control)] border border-accent-border bg-accent-muted p-3">
