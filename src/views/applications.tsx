@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Send, Trash2 } from 'lucide-react';
+import { Clock, Download, Plus, Send, Trash2 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { toCSV, downloadBlob } from '@/lib/export';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/common/empty-state';
@@ -66,16 +67,40 @@ export function ApplicationsPage() {
     onError: (err) => toast.error(apiErrorMessage(err)),
   });
 
+  const exportCsv = () => {
+    if (!data?.length) return;
+    const rows = data.map((a) => ({
+      Company: a.companyName ?? '',
+      Role: a.roleTitle ?? a.jobTitle ?? '',
+      Status: a.status,
+      Source: a.source ?? '',
+      Applied: a.appliedAt ? new Date(a.appliedAt).toISOString().slice(0, 10) : '',
+      'First response': a.firstResponseAt ? new Date(a.firstResponseAt).toISOString().slice(0, 10) : '',
+      'Days waiting': a.waitingDays ?? '',
+      'Offer amount': a.offerAmount ?? '',
+      Currency: a.offerCurrency ?? '',
+      'Offer status': a.offerStatus ?? '',
+      Notes: a.notes ?? '',
+    }));
+    downloadBlob(`applications-${new Date().toISOString().slice(0, 10)}.csv`, toCSV(rows), 'text/csv;charset=utf-8');
+  };
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         title="Applications"
         description="Every application, tracked through the pipeline."
         actions={
-          <Button onClick={() => setFormOpen(true)}>
-            <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Log application
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={exportCsv} disabled={!data?.length}>
+              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Export CSV
+            </Button>
+            <Button onClick={() => setFormOpen(true)}>
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Log application
+            </Button>
+          </div>
         }
       />
 
@@ -113,12 +138,24 @@ export function ApplicationsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13.5px] font-medium text-text">{app.roleTitle ?? app.jobTitle ?? 'Untitled application'}</p>
                   <p className="mt-0.5 truncate text-[12px] text-text-muted">
-                    {[app.companyName, app.appliedAt ? `Applied ${formatDate(app.appliedAt)}` : null, app.interviewCount ? `${app.interviewCount} interviews` : null]
+                    {[app.companyName, app.appliedAt ? `Applied ${formatDate(app.appliedAt)}` : null, app.source, app.interviewCount ? `${app.interviewCount} interviews` : null]
                       .filter(Boolean)
                       .join(' · ')}
                   </p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
+                  {app.status === 'OFFER' && app.offerAmount != null ? (
+                    <span className="rounded-full border border-accent-border bg-accent-muted px-2.5 py-1 font-mono text-[11.5px] text-accent-strong">
+                      {app.offerCurrency} {app.offerAmount.toLocaleString()}
+                      <span className="text-text-muted">/{app.offerFrequency.toLowerCase()}</span>
+                    </span>
+                  ) : null}
+                  {app.waitingDays != null && app.waitingDays >= 5 ? (
+                    <span className="flex items-center gap-1 rounded-full border border-warning/30 bg-warning-muted px-2.5 py-1 text-[11.5px] text-warning">
+                      <Clock className="h-3 w-3" strokeWidth={2} />
+                      {`${app.waitingDays}d no reply`}
+                    </span>
+                  ) : null}
                   <select
                     value={app.status}
                     onChange={(e) => move.mutate({ id: app.id, next: e.target.value })}
@@ -155,7 +192,7 @@ export function ApplicationsPage() {
         />
       )}
 
-      <ApplicationFormDialog open={formOpen} onOpenChange={(v) => { setFormOpen(v); if (!v) setEditing(null); }} application={editing} />
+      <ApplicationFormDialog key={editing?.id ?? 'new'} open={formOpen} onOpenChange={(v) => { setFormOpen(v); if (!v) setEditing(null); }} application={editing} />
       {deleting ? (
         <ConfirmDialog
           open

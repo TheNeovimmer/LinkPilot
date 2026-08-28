@@ -1,6 +1,6 @@
-import type { Application, ApplicationStatus } from '@prisma/client';
+import type { Application, ApplicationStatus, ApplicationOfferFrequency, ApplicationOfferStatus } from '@prisma/client';
 
-export type { ApplicationStatus };
+export type { ApplicationStatus, ApplicationOfferFrequency, ApplicationOfferStatus };
 
 export interface ApplicationDTO {
   id: string;
@@ -9,12 +9,21 @@ export interface ApplicationDTO {
   companyName: string | null;
   roleTitle: string | null;
   status: ApplicationStatus;
+  source: string | null;
+  firstResponseAt: Date | null;
   appliedAt: Date | null;
   notes: string | null;
   coverLetter: string | null;
+  offerAmount: number | null;
+  offerCurrency: string;
+  offerFrequency: ApplicationOfferFrequency;
+  offerStatus: ApplicationOfferStatus | null;
+  offerNotes: string | null;
   createdAt: Date;
   updatedAt: Date;
   interviewCount: number;
+  /** Days since applied without a first response (0 when not applicable). */
+  waitingDays: number | null;
 }
 
 export interface ApplicationPipelineStats {

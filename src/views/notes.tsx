@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Pin, Plus, Search, StickyNote, Trash2 } from 'lucide-react';
+import { Download, Pin, Plus, Search, StickyNote, Trash2 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { toCSV, downloadBlob } from '@/lib/export';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,6 +38,22 @@ export function NotesPage() {
     queryFn: async () => (await api.get('/notes/tags')).data.data as string[],
   });
 
+  const exportCsv = () => {
+    if (!data?.length) return;
+    downloadBlob(
+      `notes-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCSV(
+        data.map((n) => ({
+          Title: n.title,
+          Tags: n.tags.join('; '),
+          Updated: new Date(n.updatedAt).toISOString().slice(0, 10),
+          Content: n.content ?? '',
+        })),
+      ),
+      'text/csv;charset=utf-8',
+    );
+  };
+
   const togglePin = useMutation({
     mutationFn: async ({ id, pinned }: { id: string; pinned: boolean }) => api.patch(`/notes/${id}`, { pinned }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
@@ -58,10 +75,16 @@ export function NotesPage() {
         title="Notes"
         description="Snippets, takeaways and follow-ups."
         actions={
-          <Button onClick={() => setFormOpen(true)}>
-            <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
-            New note
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={exportCsv} disabled={!data?.length}>
+              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Export CSV
+            </Button>
+            <Button onClick={() => setFormOpen(true)}>
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+              New note
+            </Button>
+          </div>
         }
       />
 

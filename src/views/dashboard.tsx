@@ -21,6 +21,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { Reveal } from '@/components/common/reveal';
 import { formatDateTime, timeAgo } from '@/lib/format';
 import { CONVERSATION_STATUS_META, StatusBadge } from '@/components/common/status-badge';
+import { CommandCenter } from '@/components/dashboard/command-center';
 import { useUI } from '@/stores/ui';
 import { useLocale } from '@/stores/locale';
 import type { DashboardStats } from '@/types';
@@ -99,6 +100,9 @@ export function DashboardPage() {
           )}
         </div>
       </Reveal>
+
+      {/* Command center — funnel, response analytics, open offers, trend */}
+      {stats && !isLoading && <CommandCenter analytics={stats.analytics} />}
 
       <Reveal delay={0.1}>
         <div className="grid gap-4 lg:grid-cols-3">

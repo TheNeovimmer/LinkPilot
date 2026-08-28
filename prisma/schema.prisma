@@ -2,7 +2,7 @@
 // Domain models are scoped to a single user (the owner of the account).
 
 generator client {
-  provider      = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
 
@@ -98,21 +98,21 @@ enum ConversationStatus {
 }
 
 model Conversation {
-  id                String             @id @default(cuid())
-  userId            String
-  contactName       String
+  id                 String             @id @default(cuid())
+  userId             String
+  contactName        String
   contactLinkedInUrl String?
-  contactHeadline   String?
-  companyId         String?
-  company           Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  recruiterId       String?
-  recruiter         Recruiter?         @relation(fields: [recruiterId], references: [id], onDelete: SetNull)
-  status            ConversationStatus @default(ACTIVE)
-  pinned            Boolean            @default(false)
-  lastMessageAt     DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  messages          Message[]
+  contactHeadline    String?
+  companyId          String?
+  company            Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  recruiterId        String?
+  recruiter          Recruiter?         @relation(fields: [recruiterId], references: [id], onDelete: SetNull)
+  status             ConversationStatus @default(ACTIVE)
+  pinned             Boolean            @default(false)
+  lastMessageAt      DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  messages           Message[]
 
   @@index([userId, status])
   @@index([userId, lastMessageAt])
@@ -125,12 +125,12 @@ enum MessageRole {
 }
 
 model Message {
-  id             String      @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           MessageRole
   content        String
-  createdAt      DateTime    @default(now())
+  createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
 }
@@ -146,22 +146,22 @@ enum RecruiterStatus {
 }
 
 model Recruiter {
-  id             String           @id @default(cuid())
-  userId         String
-  name           String
-  companyId      String?
-  company        Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  title          String?
-  linkedinUrl    String?
-  email          String?
-  phone          String?
-  notes          String?
-  status         RecruiterStatus  @default(NEW)
-  lastContactAt  DateTime?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  conversations  Conversation[]
-  interviews     Interview[]
+  id            String          @id @default(cuid())
+  userId        String
+  name          String
+  companyId     String?
+  company       Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  title         String?
+  linkedinUrl   String?
+  email         String?
+  phone         String?
+  notes         String?
+  status        RecruiterStatus @default(NEW)
+  lastContactAt DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  conversations Conversation[]
+  interviews    Interview[]
 
   @@index([userId, status])
 }
@@ -193,29 +193,29 @@ enum JobStatus {
 }
 
 model Job {
-  id          String     @id @default(cuid())
-  userId      String
-  companyId   String?
-  company     Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  title       String
-  url         String?
-  description String?
-  location    String?
-  remote      Boolean    @default(false)
-  salaryMin   Int?
-  salaryMax   Int?
-  status      JobStatus  @default(WATCHLIST)
+  id           String                       @id @default(cuid())
+  userId       String
+  companyId    String?
+  company      Company?                     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  title        String
+  url          String?
+  description  String?
+  location     String?
+  remote       Boolean                      @default(false)
+  salaryMin    Int?
+  salaryMax    Int?
+  status       JobStatus                    @default(WATCHLIST)
   /// 0-100 AI fit score (populated by the analyze-job flow).
-  fitScore    Int?
+  fitScore     Int?
   /// AI analysis: summary, strengths, gaps, questions (JSON).
-  analysis    Json?
+  analysis     Json?
   /// pgvector embedding for optional semantic job search (1536-dim).
-  embedding   Unsupported("vector(1536)")?
-  postedAt    DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  embedding    Unsupported("vector(1536)")?
+  postedAt     DateTime?
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
   applications Application[]
-  interviews  Interview[]
+  interviews   Interview[]
 
   @@index([userId, status])
 }
@@ -230,23 +230,47 @@ enum ApplicationStatus {
   WITHDRAWN
 }
 
+enum ApplicationOfferFrequency {
+  HOURLY
+  MONTHLY
+  YEARLY
+}
+
+enum ApplicationOfferStatus {
+  PENDING
+  NEGOTIATING
+  ACCEPTED
+  DECLINED
+}
+
 model Application {
-  id          String            @id @default(cuid())
-  userId      String
-  jobId       String?
-  job         Job?              @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  id              String                    @id @default(cuid())
+  userId          String
+  jobId           String?
+  job             Job?                      @relation(fields: [jobId], references: [id], onDelete: SetNull)
   /// Free-text fields so an application can exist without a tracked job.
-  companyName String?
-  roleTitle   String?
-  status      ApplicationStatus @default(DRAFT)
-  appliedAt   DateTime?
-  notes       String?
-  coverLetter String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  interviews  Interview[]
+  companyName     String?
+  roleTitle       String?
+  status          ApplicationStatus         @default(DRAFT)
+  /// Where the application was submitted — company site, LinkedIn, referral…
+  source          String?
+  /// First time the employer replied (set when status → INTERVIEWING/OFFER/REJECTED).
+  firstResponseAt DateTime?
+  appliedAt       DateTime?
+  notes           String?
+  coverLetter     String?
+  /// Offer compensation (set when a real offer is made).
+  offerAmount     Int?
+  offerCurrency   String                    @default("USD")
+  offerFrequency  ApplicationOfferFrequency @default(YEARLY)
+  offerStatus     ApplicationOfferStatus?
+  offerNotes      String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  interviews      Interview[]
 
   @@index([userId, status])
+  @@index([userId, appliedAt])
 }
 
 enum InterviewMode {

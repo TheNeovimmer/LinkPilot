@@ -32,4 +32,39 @@ export interface DashboardStats {
     overdue: number;
     dueNext48h: number;
   };
+  /** Job-search decision intelligence (computed from application timestamps). */
+  analytics: {
+    /** Funnel counts — how far submitted apps progressed. */
+    funnel: {
+      submitted: number;
+      interviewing: number;
+      offers: number;
+      accepted: number;
+      rejected: number;
+    };
+    /** Applications sent per day over the trailing N days (for trends). */
+    applicationsTrend: { date: string; count: number }[];
+    /** Real response metrics using firstResponseAt. */
+    responses: {
+      responses: number;
+      awaitingReply: number;
+      /** % of submitted apps that got a real response. */
+      responseRate: number | null;
+      /** Mean days between apply and first response (null if none yet). */
+      avgDaysToFirstResponse: number | null;
+      days7: number;
+      days14: number;
+      days30: number;
+    };
+    /** Open offers awaiting a decision. */
+    offersOpen: {
+      id: string;
+      roleTitle: string | null;
+      companyName: string | null;
+      offerAmount: number | null;
+      offerCurrency: string;
+      offerFrequency: string;
+      offerStatus: string | null;
+    }[];
+  };
 }

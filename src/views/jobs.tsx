@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Briefcase, Check, Import as ImportIcon, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
+import { Briefcase, Check, Download, Import as ImportIcon, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { toCSV, downloadBlob } from '@/lib/export';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -63,6 +64,28 @@ export function JobsPage() {
     onError: (err) => toast.error(apiErrorMessage(err)),
   });
 
+  const exportCsv = () => {
+    const jobs = data?.items ?? [];
+    if (!jobs.length) return;
+    downloadBlob(
+      `jobs-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCSV(
+        jobs.map((j) => ({
+          Role: j.title,
+          Company: j.companyName ?? '',
+          Status: j.status,
+          Location: j.location ?? '',
+          Remote: j.remote ? 'yes' : 'no',
+          'Salary range': j.salaryMin != null || j.salaryMax != null ? `${j.salaryMin ?? ''}-${j.salaryMax ?? ''}` : '',
+          'Fit score': j.fitScore ?? '',
+          Posted: j.postedAt ? new Date(j.postedAt).toISOString().slice(0, 10) : '',
+          URL: j.url ?? '',
+        })),
+      ),
+      'text/csv;charset=utf-8',
+    );
+  };
+
   const bulkMove = useMutation({
     mutationFn: async ({ ids, status: s }: { ids: string[]; status: string }) => api.patch('/jobs/bulk', { ids, status: s }),
     onSuccess: () => {
@@ -91,6 +114,10 @@ export function JobsPage() {
         description="Track roles, analyze fit, and keep the pipeline moving."
         actions={
           <div className="flex gap-2">
+            <Button variant="secondary" onClick={exportCsv} disabled={!data?.items?.length}>
+              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Export CSV
+            </Button>
             <Button variant="secondary" onClick={() => setImportOpen(true)}>
               <ImportIcon className="h-3.5 w-3.5" strokeWidth={1.75} />
               Import from URL

@@ -105,6 +105,8 @@ export interface Job {
 }
 
 export type ApplicationStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'INTERVIEWING' | 'OFFER' | 'REJECTED' | 'WITHDRAWN';
+export type ApplicationOfferFrequency = 'HOURLY' | 'MONTHLY' | 'YEARLY';
+export type ApplicationOfferStatus = 'PENDING' | 'NEGOTIATING' | 'ACCEPTED' | 'DECLINED';
 
 export interface Application {
   id: string;
@@ -113,12 +115,20 @@ export interface Application {
   companyName: string | null;
   roleTitle: string | null;
   status: ApplicationStatus;
+  source: string | null;
+  firstResponseAt: string | null;
   appliedAt: string | null;
   notes: string | null;
   coverLetter: string | null;
+  offerAmount: number | null;
+  offerCurrency: string;
+  offerFrequency: ApplicationOfferFrequency;
+  offerStatus: ApplicationOfferStatus | null;
+  offerNotes: string | null;
   createdAt: string;
   updatedAt: string;
   interviewCount: number;
+  waitingDays: number | null;
 }
 
 export type InterviewMode = 'PHONE' | 'VIDEO' | 'ONSITE' | 'TECHNICAL';
@@ -217,6 +227,28 @@ export interface DashboardStats {
     completed: number;
   };
   reminders: { overdue: number; dueNext48h: number };
+  analytics: {
+    funnel: { submitted: number; interviewing: number; offers: number; accepted: number; rejected: number };
+    applicationsTrend: { date: string; count: number }[];
+    responses: {
+      responses: number;
+      awaitingReply: number;
+      responseRate: number | null;
+      avgDaysToFirstResponse: number | null;
+      days7: number;
+      days14: number;
+      days30: number;
+    };
+    offersOpen: {
+      id: string;
+      roleTitle: string | null;
+      companyName: string | null;
+      offerAmount: number | null;
+      offerCurrency: string;
+      offerFrequency: ApplicationOfferFrequency;
+      offerStatus: ApplicationOfferStatus | null;
+    }[];
+  };
 }
 
 export interface AuditLogEntry {

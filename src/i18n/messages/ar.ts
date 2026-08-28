@@ -80,6 +80,22 @@ export const messages: Messages = {
   'dashboard.reminders.body': '{n} خلال 48 ساعة القادمة.',
   'dashboard.reminders.view': 'عرض التذكيرات',
 
+  // Command center analytics
+  'analytics.funnel.title': 'مسار الطلبات',
+  'analytics.funnel.submitted': 'أُرسلت',
+  'analytics.funnel.interview': 'مقابلة',
+  'analytics.funnel.offer': 'عرض عمل',
+  'analytics.funnel.accepted': 'مقبول',
+  'analytics.trend.title': 'الطلبات المرسلة · آخر 30 يومًا',
+  'analytics.responses.title': 'تحليلات الردود',
+  'analytics.responses.rate': 'معدل الرد',
+  'analytics.responses.avgDays': 'متوسط أيام الرد',
+  'analytics.responses.awaiting': 'بانتظار الرد',
+  'analytics.responses.within7': 'ردود ≤7أيام',
+  'analytics.offers.title': 'عروض العمل المفتوحة',
+  'analytics.offers.open': 'عرض عمل',
+  'analytics.offers.none': 'لا توجد عروض مفتوحة — واصل المتابعة.',
+
   'common.loading': 'جارٍ التحميل…',
   'common.delete': 'حذف',
   'common.cancel': 'إلغاء',

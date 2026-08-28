@@ -16,11 +16,24 @@ const STATUS_TO_JOB: Partial<Record<ApplicationStatus, JobStatus>> = {
   WITHDRAWN: 'CLOSED',
 };
 
+/** Statuses that count as "the employer actually replied". */
+const RESPONDED_STATUSES = new Set<ApplicationStatus>(['INTERVIEWING', 'OFFER', 'REJECTED']);
+
 const MILESTONES: Partial<Record<ApplicationStatus, { title: string }>> = {
   INTERVIEWING: { title: 'Application is in interviews' },
   OFFER: { title: 'You received an offer' },
   REJECTED: { title: 'Application was rejected' },
 };
+
+/** Fill in a first-response timestamp when the app first reaches a replied status. */
+function applyFirstResponse(
+  data: Parameters<ApplicationRepository['update']>[2],
+  current: ApplicationDTO,
+): void {
+  if (RESPONDED_STATUSES.has(data.status as ApplicationStatus) && !current.firstResponseAt) {
+    data.firstResponseAt = new Date();
+  }
+}
 
 export class ApplicationService {
   constructor(private readonly repo: ApplicationRepository) {}
@@ -56,6 +69,8 @@ export class ApplicationService {
   async create(userId: string, data: Parameters<ApplicationRepository['create']>[1]): Promise<ApplicationDTO> {
     // First submitted application auto-records the applied date.
     if (data.status === 'SUBMITTED' && !data.appliedAt) data.appliedAt = new Date();
+    // Records a first response if created directly in a replied state.
+    if (data.status && RESPONDED_STATUSES.has(data.status)) data.firstResponseAt = new Date();
     const application = await this.repo.create(userId, data);
     await this.applyStatusSideEffects(userId, application);
     await auditService.log(userId, 'application.create', 'application', application.id, { status: application.status });
@@ -67,6 +82,8 @@ export class ApplicationService {
     const merged = { ...current, ...data };
     // Auto-set appliedAt when the application first becomes submitted.
     if (merged.status === 'SUBMITTED' && !merged.appliedAt) data.appliedAt = new Date();
+    // Auto-record first employer response.
+    if (data.status) applyFirstResponse(data, current);
     const updated = await this.repo.update(userId, id, data);
     const result = updated!;
     if (result.status !== current.status || result.jobId !== current.jobId) {
@@ -90,6 +107,7 @@ export class ApplicationService {
       if (!current || current.status === status) continue;
       const data: Parameters<ApplicationRepository['update']>[2] = { status };
       if (status === 'SUBMITTED' && !current.appliedAt) data.appliedAt = new Date();
+      applyFirstResponse(data, current);
       const result = await this.repo.update(userId, id, data);
       if (result) {
         await this.applyStatusSideEffects(userId, result);

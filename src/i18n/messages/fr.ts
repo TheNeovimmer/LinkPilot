@@ -80,6 +80,22 @@ export const messages: Messages = {
   'dashboard.reminders.body': '{n} à échéance dans les 48 prochaines heures.',
   'dashboard.reminders.view': 'Voir les rappels',
 
+  // Command center analytics
+  'analytics.funnel.title': "Entonnoir de candidatures",
+  'analytics.funnel.submitted': 'Envoyées',
+  'analytics.funnel.interview': 'Entretiens',
+  'analytics.funnel.offer': 'Offres',
+  'analytics.funnel.accepted': 'Acceptées',
+  'analytics.trend.title': 'Candidatures envoyées · 30 derniers jours',
+  'analytics.responses.title': 'Analyses des réponses',
+  'analytics.responses.rate': 'Taux de réponse',
+  'analytics.responses.avgDays': 'Délai moyen de réponse',
+  'analytics.responses.awaiting': 'En attente de réponse',
+  'analytics.responses.within7': 'Réponses ≤7j',
+  'analytics.offers.title': 'Offres en cours',
+  'analytics.offers.open': 'Offre',
+  'analytics.offers.none': 'Aucune offre en cours — continuez.',
+
   'common.loading': 'Chargement…',
   'common.delete': 'Supprimer',
   'common.cancel': 'Annuler',

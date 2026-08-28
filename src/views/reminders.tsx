@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { AlarmClock, Bell, Check, Plus, Trash2 } from 'lucide-react';
+import { AlarmClock, Bell, Check, Download, Plus, Trash2 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { toCSV, downloadBlob } from '@/lib/export';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,6 +41,22 @@ export function RemindersPage() {
     onError: (err) => toast.error(apiErrorMessage(err)),
   });
 
+  const exportCsv = () => {
+    if (!data?.length) return;
+    downloadBlob(
+      `reminders-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCSV(
+        data.map((r) => ({
+          Title: r.title,
+          Due: r.dueAt ? new Date(r.dueAt).toISOString().slice(0, 10) : '',
+          Done: r.done ? 'yes' : 'no',
+          Body: r.body ?? '',
+        })),
+      ),
+      'text/csv;charset=utf-8',
+    );
+  };
+
   const snooze = useMutation({
     mutationFn: async (r: Reminder) => api.patch(`/reminders/${r.id}`, { dueAt: new Date(Date.now() + 24 * 3_600_000).toISOString() }),
     onSuccess: () => {
@@ -67,10 +84,16 @@ export function RemindersPage() {
         title="Reminders"
         description="Follow-ups that keep the pipeline moving."
         actions={
-          <Button onClick={() => setFormOpen(true)}>
-            <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
-            New reminder
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={exportCsv} disabled={!data?.length}>
+              <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Export CSV
+            </Button>
+            <Button onClick={() => setFormOpen(true)}>
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+              New reminder
+            </Button>
+          </div>
         }
       />
 

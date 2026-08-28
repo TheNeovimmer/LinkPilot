@@ -1,4 +1,4 @@
-import type { Prisma, ApplicationStatus } from '@prisma/client';
+import type { Prisma, ApplicationStatus, ApplicationOfferFrequency, ApplicationOfferStatus } from '@prisma/client';
 import { prisma } from '../../database/prisma';
 import { parsePagination, pickOrder, pickSort, prismaTakeSkip, buildMeta } from '../../utils/pagination';
 import type { z } from 'zod';
@@ -6,6 +6,23 @@ import type { applicationQuerySchema } from './schema';
 import type { ApplicationDTO, ApplicationPipelineStats } from './types';
 
 type ListQuery = z.infer<typeof applicationQuerySchema>;
+
+export type ApplicationInput = {
+  jobId?: string | null;
+  companyName?: string | null;
+  roleTitle?: string | null;
+  status?: ApplicationStatus;
+  source?: string | null;
+  firstResponseAt?: Date | null;
+  appliedAt?: Date | null;
+  notes?: string | null;
+  coverLetter?: string | null;
+  offerAmount?: number | null;
+  offerCurrency?: string;
+  offerFrequency?: ApplicationOfferFrequency;
+  offerStatus?: ApplicationOfferStatus | null;
+  offerNotes?: string | null;
+};
 
 const include = {
   job: { select: { title: true } },
@@ -18,14 +35,31 @@ type ApplicationRow = {
   companyName: string | null;
   roleTitle: string | null;
   status: ApplicationStatus;
+  source: string | null;
+  firstResponseAt: Date | null;
   appliedAt: Date | null;
   notes: string | null;
   coverLetter: string | null;
+  offerAmount: number | null;
+  offerCurrency: string;
+  offerFrequency: ApplicationOfferFrequency;
+  offerStatus: ApplicationOfferStatus | null;
+  offerNotes: string | null;
   createdAt: Date;
   updatedAt: Date;
   job?: { title: string } | null;
   _count?: { interviews: number };
 };
+
+function waitingDays(row: ApplicationRow): number | null {
+  // Only meaningful once applied and still waiting on the employer.
+  if (!row.appliedAt) return null;
+  const awaiting = ['SUBMITTED', 'UNDER_REVIEW'].includes(row.status);
+  if (!awaiting) return null;
+  if (row.firstResponseAt && row.firstResponseAt <= row.appliedAt) return null;
+  const from = row.firstResponseAt ?? row.appliedAt;
+  return Math.max(0, Math.floor((Date.now() - from.getTime()) / 86_400_000));
+}
 
 function mapApplication(row: ApplicationRow): ApplicationDTO {
   return {
@@ -35,12 +69,20 @@ function mapApplication(row: ApplicationRow): ApplicationDTO {
     companyName: row.companyName,
     roleTitle: row.roleTitle,
     status: row.status,
+    source: row.source,
+    firstResponseAt: row.firstResponseAt,
     appliedAt: row.appliedAt,
     notes: row.notes,
     coverLetter: row.coverLetter,
+    offerAmount: row.offerAmount,
+    offerCurrency: row.offerCurrency,
+    offerFrequency: row.offerFrequency,
+    offerStatus: row.offerStatus,
+    offerNotes: row.offerNotes,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     interviewCount: row._count?.interviews ?? 0,
+    waitingDays: waitingDays(row),
   };
 }
 
@@ -51,6 +93,7 @@ export class ApplicationRepository {
       userId,
       ...(query.status ? { status: query.status } : {}),
       ...(query.jobId ? { jobId: query.jobId } : {}),
+      ...(query.source ? { source: query.source } : {}),
       ...(query.q
         ? {
             OR: [
@@ -76,12 +119,12 @@ export class ApplicationRepository {
     return row ? mapApplication(row) : null;
   }
 
-  async create(userId: string, data: { jobId?: string | null; companyName?: string | null; roleTitle?: string | null; status?: ApplicationStatus; appliedAt?: Date | null; notes?: string | null; coverLetter?: string | null }): Promise<ApplicationDTO> {
+  async create(userId: string, data: ApplicationInput): Promise<ApplicationDTO> {
     const row = await prisma.application.create({ data: { userId, ...data }, include });
     return mapApplication(row);
   }
 
-  async update(userId: string, id: string, data: Partial<{ jobId: string | null; companyName: string | null; roleTitle: string | null; status: ApplicationStatus; appliedAt: Date | null; notes: string | null; coverLetter: string | null }>): Promise<ApplicationDTO | null> {
+  async update(userId: string, id: string, data: Partial<ApplicationInput>): Promise<ApplicationDTO | null> {
     const result = await prisma.application.updateMany({ where: { id, userId }, data });
     if (result.count === 0) return null;
     return this.findById(userId, id);

@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { CalendarClock, Check, Clock, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { CalendarClock, CalendarPlus, Check, Clock, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
+import { buildICS, downloadBlob } from '@/lib/export';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -61,6 +62,23 @@ export function InterviewsPage() {
   });
 
   const now = Date.now();
+
+  const exportIcs = (interview: Interview) => {
+    const start = new Date(interview.scheduledAt);
+    const end = new Date(start.getTime() + (interview.durationMin ?? 45) * 60_000);
+    downloadBlob(
+      `interview-${interview.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`,
+      buildICS({
+        uid: `interview-${interview.id}@linkpilot`,
+        summary: `Interview: ${interview.title}`,
+        description: interview.feedback || `Interview scheduled in LinkPilot${interview.companyName ? ` at ${interview.companyName}` : ''}`,
+        location: interview.location ?? undefined,
+        start,
+        end,
+      }),
+      'text/calendar;charset=utf-8',
+    );
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -126,6 +144,9 @@ export function InterviewsPage() {
                       <Button variant="secondary" size="sm" onClick={() => setPrep(interview)}>
                         <Sparkles className="h-3.5 w-3.5" strokeWidth={1.75} />
                         AI prep
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" onClick={() => exportIcs(interview)} title="Add to calendar (.ics)">
+                        <CalendarPlus className="h-3.5 w-3.5 text-text-secondary" strokeWidth={1.75} />
                       </Button>
                       <Button variant="ghost" size="icon-sm" onClick={() => complete.mutate(interview.id)} title="Mark completed">
                         <Check className="h-3.5 w-3.5 text-accent" strokeWidth={1.75} />
