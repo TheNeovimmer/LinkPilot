@@ -1,5 +1,4 @@
 import { prisma } from '../../database/prisma.js';
-import { cacheGet, cacheSet } from '../../database/redis.js';
 import type { ConversationStatus, RecruiterStatus, JobStatus, ApplicationStatus } from '@prisma/client';
 import type { DashboardStats } from './types.js';
 
@@ -81,13 +80,8 @@ export class DashboardService {
     };
   }
 
-  /** Dashboard stats with a short Redis cache. */
+  /** Dashboard stats (computed on demand — no cache). */
   async stats(userId: string): Promise<DashboardStats> {
-    const key = `dashboard:${userId}`;
-    const cached = await cacheGet<DashboardStats>(key);
-    if (cached) return cached;
-    const stats = await this.compute(userId);
-    await cacheSet(key, stats, 30);
-    return stats;
+    return this.compute(userId);
   }
 }

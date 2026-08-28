@@ -7,14 +7,12 @@ vi.mock('../src/database/prisma.js', () => ({
     interview: { update: vi.fn().mockResolvedValue({}) },
   },
 }));
-vi.mock('../src/database/redis.js', () => ({ cacheDel: vi.fn() }));
 vi.mock('../src/modules/audit/service.js', () => ({ auditService: { log: vi.fn().mockResolvedValue(undefined) } }));
 vi.mock('../src/modules/notifications/service.js', () => ({
   notificationService: { create: vi.fn().mockResolvedValue({ id: 'n1' }) },
 }));
 
 import { prisma } from '../src/database/prisma.js';
-import { cacheDel } from '../src/database/redis.js';
 import { notificationService } from '../src/modules/notifications/service.js';
 import { ApplicationService } from '../src/modules/applications/service.js';
 import { InterviewService } from '../src/modules/interviews/service.js';
@@ -58,7 +56,6 @@ describe('ApplicationService status side effects', () => {
       where: { id: 'job1', userId: 'user1' },
       data: { status: 'APPLIED' },
     });
-    expect(cacheDel).toHaveBeenCalled();
   });
 
   it('notifies only on milestones (OFFER) and not on plain updates (DRAFT)', async () => {

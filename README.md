@@ -6,7 +6,7 @@ Track conversations, jobs, recruiters, companies, applications, interviews, note
 
 ```
 frontend  (React 19 · Vite · Tailwind v4 · TanStack Query · Zustand)
-backend   (Express 5 · TypeScript · Prisma + PostgreSQL/pgvector · Redis · Better Auth · Socket.IO)
+backend   (Express 5 · TypeScript · Prisma + Neon (PostgreSQL/pgvector) · Better Auth · Socket.IO)
 docker    (Dockerfiles + nginx for production; dev runs natively)
 ```
 
@@ -14,24 +14,21 @@ docker    (Dockerfiles + nginx for production; dev runs natively)
 
 ## Quick start (local dev)
 
-**1. Start Postgres (with pgvector) and Redis.** Docker works fine — they are just services:
+**1. Create a Neon database.** LinkPilot uses [Neon](https://neon.tech) (serverless Postgres with pgvector) — no local database or Redis required. In the Neon console, create a project and copy the **pooled** connection string (host ends in `-pooler`). It looks like:
 
-```bash
-docker run -d --name linkpilot-pg -p 5432:5432 -e POSTGRES_USER=linkpilot \
-  -e POSTGRES_PASSWORD=linkpilot -e POSTGRES_DB=linkpilot pgvector/pgvector:pg16
-docker run -d --name linkpilot-redis -p 6379:6379 redis:7
 ```
-
-> Already have a Postgres container? Install pgvector into it: `docker exec <name> sh -c "apt-get update && apt-get install -y postgresql-18-pgvector"` (postgres 18) then `docker exec <name> psql -U postgres -c "ALTER ROLE linkpilot SUPERUSER CREATEDB;"` — the migration creates the `vector` extension.
+postgresql://USER:PASSWORD@...pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require
+```
 
 **2. Configure the backend:**
 
 ```bash
 cp backend/.env.example backend/.env   # or create backend/.env
+# set DATABASE_URL to your Neon connection string
 # fill in AI_API_KEY to unlock AI features (OpenCode Zen: https://opencode.ai/zen)
 ```
 
-Defaults already point at `localhost:5432` / `localhost:6379` and an OpenCode Zen endpoint (`AI_BASE_URL=https://opencode.ai/zen/v1`, `AI_MODEL=deepseek-v4-flash-free`).
+Defaults point at a Neon database and an OpenCode Zen endpoint (`AI_BASE_URL=https://opencode.ai/zen/v1`, `AI_MODEL=deepseek-v4-flash-free`).
 
 **3. Install, migrate, seed, run:**
 
@@ -81,7 +78,7 @@ Without a key the app runs fully — AI buttons surface a clear "not configured"
 | `npm run db:seed`        | Idempotent demo dataset                       |
 | `npm run db:studio`      | Prisma Studio                                 |
 
-Production: `docker compose up --build` (backend + nginx serving the built frontend; edit `AI_API_KEY` under `backend.environment` first).
+Production: `docker compose up --build` (backend + nginx serving the built frontend; edit `AI_API_KEY` and `DATABASE_URL` under `backend.environment` first).
 
 ---
 
@@ -105,7 +102,7 @@ src/modules/
   notifications Socket.IO realtime push + in-app inbox
   ai            streaming SSE endpoints: draft-reply, rewrite, summarize, analyze-job, interview-prep
   audit         immutable audit log
-  dashboard     Redis-cached stats
+  dashboard     stats (computed on demand)
 ```
 
 - **Response envelope:** `{ success, data, meta }` everywhere; errors `{ success, error: { code, message } }`.

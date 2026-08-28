@@ -2,7 +2,6 @@ import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
-import { connectRedis, disconnectRedis } from './database/redis.js';
 import { prisma } from './database/prisma.js';
 import { setupSocket } from './socket/index.js';
 import { wireNotificationPublisher } from './modules/notifications/service.js';
@@ -12,9 +11,7 @@ import { startWorkers } from './workers/index.js';
 async function bootstrap(): Promise<void> {
   // DB connectivity check (fast fail with a clear message).
   await prisma.$connect();
-  logger.info('PostgreSQL connected');
-
-  await connectRedis();
+  logger.info('Neon/PostgreSQL connected');
 
   const app = createApp();
   const server = createServer(app);
@@ -35,7 +32,6 @@ async function bootstrap(): Promise<void> {
   const shutdown = async (signal: string) => {
     logger.info(`${signal} received, shutting down...`);
     server.close();
-    await disconnectRedis().catch(() => {});
     await prisma.$disconnect().catch(() => {});
     process.exit(0);
   };

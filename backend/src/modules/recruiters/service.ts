@@ -1,6 +1,5 @@
 import { ApiError } from '../../utils/ApiError.js';
 import { auditService } from '../audit/service.js';
-import { cacheDel } from '../../database/redis.js';
 import type { RecruiterDTO } from './types.js';
 import { RecruiterRepository } from './repository.js';
 
@@ -19,7 +18,6 @@ export class RecruiterService {
 
   async create(userId: string, data: Parameters<RecruiterRepository['create']>[1]): Promise<RecruiterDTO> {
     const recruiter = await this.repo.create(userId, data);
-    await cacheDel(`dashboard:${userId}`, `recruiters:pipeline:${userId}`);
     await auditService.log(userId, 'recruiter.create', 'recruiter', recruiter.id, { name: recruiter.name });
     return recruiter;
   }
@@ -27,7 +25,6 @@ export class RecruiterService {
   async update(userId: string, id: string, data: Parameters<RecruiterRepository['update']>[2]): Promise<RecruiterDTO> {
     await this.get(userId, id);
     const updated = await this.repo.update(userId, id, data);
-    await cacheDel(`dashboard:${userId}`, `recruiters:pipeline:${userId}`);
     await auditService.log(userId, 'recruiter.update', 'recruiter', id);
     return updated!;
   }
@@ -35,7 +32,6 @@ export class RecruiterService {
   async remove(userId: string, id: string): Promise<void> {
     await this.get(userId, id);
     await this.repo.remove(userId, id);
-    await cacheDel(`dashboard:${userId}`, `recruiters:pipeline:${userId}`);
     await auditService.log(userId, 'recruiter.delete', 'recruiter', id);
   }
 

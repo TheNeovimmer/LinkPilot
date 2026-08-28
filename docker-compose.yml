@@ -1,38 +1,8 @@
 name: linkpilot
 
-# Full local stack: Postgres (pgvector) + Redis + API + web (nginx).
+# Production stack: API + web (nginx). Database is Neon (serverless Postgres) — no local Postgres/Redis.
 # `docker compose up --build` then open http://localhost:8080
 services:
-  postgres:
-    image: pgvector/pgvector:pg16
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: linkpilot
-      POSTGRES_PASSWORD: linkpilot
-      POSTGRES_DB: linkpilot
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U linkpilot -d linkpilot"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   backend:
     build:
       context: .
@@ -44,15 +14,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgresql://linkpilot:linkpilot@postgres:5432/linkpilot
-      REDIS_URL: redis://redis:6379
+      # DATABASE_URL comes from your .env (set the pooled Neon URL there).
+      DATABASE_URL: ${DATABASE_URL}
       BETTER_AUTH_URL: http://localhost:8080
       CLIENT_URL: http://localhost:8080
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
     ports:
       - "4000:4000"
 
@@ -65,7 +30,3 @@ services:
       - backend
     ports:
       - "8080:80"
-
-volumes:
-  pgdata:
-  redisdata:

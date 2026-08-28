@@ -1,6 +1,5 @@
 import { ApiError } from '../../utils/ApiError.js';
 import { auditService } from '../audit/service.js';
-import { cacheDel } from '../../database/redis.js';
 import { prisma } from '../../database/prisma.js';
 import type { ProfileDTO } from './types.js';
 import { ProfileRepository } from './repository.js';
@@ -23,7 +22,6 @@ export class UserService {
   ): Promise<ProfileDTO> {
     const updated = await this.repo.upsert(userId, data);
     if (!updated) throw ApiError.notFound('Profile not found');
-    await cacheDel(`dashboard:${userId}`);
     await auditService.log(userId, 'profile.update', 'profile', userId);
     return updated;
   }
@@ -54,7 +52,6 @@ export class UserService {
       prisma.account.deleteMany({ where: { userId } }),
       prisma.user.delete({ where: { id: userId } }),
     ]);
-    await cacheDel(`dashboard:${userId}`);
   }
 
   /** Full backup of every row owned by the user (self-hosted = own your data). */

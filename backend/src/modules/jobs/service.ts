@@ -1,6 +1,5 @@
 import { ApiError } from '../../utils/ApiError.js';
 import { auditService } from '../audit/service.js';
-import { cacheDel } from '../../database/redis.js';
 import { aiClient } from '../ai/client.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
@@ -48,7 +47,6 @@ export class JobService {
   async create(userId: string, data: Parameters<JobRepository['create']>[1]): Promise<JobDTO> {
     const job = await this.repo.create(userId, data);
     void this.embedJob(job);
-    await cacheDel(`dashboard:${userId}`, `jobs:stats:${userId}`);
     await auditService.log(userId, 'job.create', 'job', job.id, { title: job.title });
     return job;
   }
@@ -57,7 +55,6 @@ export class JobService {
     await this.get(userId, id);
     const updated = await this.repo.update(userId, id, data);
     if (updated) void this.embedJob(updated);
-    await cacheDel(`dashboard:${userId}`, `jobs:stats:${userId}`);
     await auditService.log(userId, 'job.update', 'job', id);
     return updated!;
   }
@@ -65,7 +62,6 @@ export class JobService {
   /** Bulk status move (e.g. mark a batch of watchlist jobs as applied). */
   async bulkUpdate(userId: string, ids: string[], status: JobDTO['status']): Promise<number> {
     const result = await this.repo.bulkUpdate(userId, ids, status);
-    await cacheDel(`dashboard:${userId}`, `jobs:stats:${userId}`);
     await auditService.log(userId, 'job.bulkUpdate', 'job', undefined, { count: result, status });
     return result;
   }
@@ -115,7 +111,6 @@ export class JobService {
       status: 'WATCHLIST',
     });
     void this.embedJob(job);
-    await cacheDel(`dashboard:${userId}`, `jobs:stats:${userId}`);
     await auditService.log(userId, 'job.import', 'job', job.id, { title: job.title, company: extracted.companyName });
     return job;
   }
@@ -123,7 +118,6 @@ export class JobService {
   async remove(userId: string, id: string): Promise<void> {
     await this.get(userId, id);
     await this.repo.remove(userId, id);
-    await cacheDel(`dashboard:${userId}`, `jobs:stats:${userId}`);
     await auditService.log(userId, 'job.delete', 'job', id);
   }
 

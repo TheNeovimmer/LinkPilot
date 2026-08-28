@@ -1,6 +1,5 @@
 import { ApiError } from '../../utils/ApiError.js';
 import { auditService } from '../audit/service.js';
-import { cacheDel } from '../../database/redis.js';
 import type { MessageDTO } from './types.js';
 import { MessageRepository } from './repository.js';
 import { ConversationRepository } from '../conversations/repository.js';
@@ -30,7 +29,6 @@ export class MessageService {
     await this.assertConversation(userId, conversationId);
     const message = await this.repo.create(conversationId, role, content);
     await this.conversations.touchLastMessage(conversationId);
-    await cacheDel(`dashboard:${userId}`, `conversations:${userId}`);
     await auditService.log(userId, 'message.create', 'message', message.id, { conversationId, role });
     return message;
   }

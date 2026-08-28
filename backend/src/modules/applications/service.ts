@@ -1,6 +1,5 @@
 import { ApiError } from '../../utils/ApiError.js';
 import { auditService } from '../audit/service.js';
-import { cacheDel } from '../../database/redis.js';
 import { notificationService } from '../notifications/service.js';
 import { prisma } from '../../database/prisma.js';
 import type { ApplicationStatus, JobStatus } from '@prisma/client';
@@ -41,7 +40,6 @@ export class ApplicationService {
     const jobStatus = STATUS_TO_JOB[application.status];
     if (jobStatus && application.jobId) {
       await prisma.job.updateMany({ where: { id: application.jobId, userId }, data: { status: jobStatus } });
-      await cacheDel(`dashboard:${userId}`, `jobs:stats:${userId}`);
     }
     const milestone = MILESTONES[application.status];
     if (milestone) {
@@ -60,7 +58,6 @@ export class ApplicationService {
     if (data.status === 'SUBMITTED' && !data.appliedAt) data.appliedAt = new Date();
     const application = await this.repo.create(userId, data);
     await this.applyStatusSideEffects(userId, application);
-    await cacheDel(`dashboard:${userId}`, `applications:pipeline:${userId}`);
     await auditService.log(userId, 'application.create', 'application', application.id, { status: application.status });
     return application;
   }
@@ -75,7 +72,6 @@ export class ApplicationService {
     if (result.status !== current.status || result.jobId !== current.jobId) {
       await this.applyStatusSideEffects(userId, result);
     }
-    await cacheDel(`dashboard:${userId}`, `applications:pipeline:${userId}`);
     await auditService.log(userId, 'application.update', 'application', id, { status: result.status });
     return result;
   }
@@ -83,7 +79,6 @@ export class ApplicationService {
   async remove(userId: string, id: string): Promise<void> {
     await this.get(userId, id);
     await this.repo.remove(userId, id);
-    await cacheDel(`dashboard:${userId}`, `applications:pipeline:${userId}`);
     await auditService.log(userId, 'application.delete', 'application', id);
   }
 
@@ -101,7 +96,6 @@ export class ApplicationService {
         updated++;
       }
     }
-    await cacheDel(`dashboard:${userId}`, `applications:pipeline:${userId}`);
     await auditService.log(userId, 'application.bulkUpdate', 'application', undefined, { count: updated, status });
     return updated;
   }

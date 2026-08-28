@@ -10,7 +10,6 @@ import { toNodeHandler } from 'better-auth/node';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { prisma } from './database/prisma.js';
-import { redis } from './database/redis.js';
 import { requestId } from './middlewares/requestId.js';
 import { apiLimiter } from './middlewares/rateLimit.js';
 import { notFound, errorHandler } from './middlewares/error.js';
@@ -73,17 +72,13 @@ export function createApp(): Express {
   // Auth (Better Auth handles its own routes at /api/auth/*)
   app.use('/api/auth', toNodeHandler(auth));
 
-  // Health — pings Postgres + Redis so monitoring sees the real state.
+  // Health — pings Neon/Postgres so monitoring sees the real state.
   app.get('/health', async (_req, res) => {
     try {
-      const [db, cache] = await Promise.all([
-        prisma.$queryRaw`SELECT 1`,
-        redis.ping(),
-      ]);
+      await prisma.$queryRaw`SELECT 1`;
       res.json({
         status: 'ok',
-        db: db ? 'up' : 'down',
-        redis: cache === 'PONG' ? 'up' : 'down',
+        db: 'up',
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
       });

@@ -15,8 +15,7 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string()
     .min(1)
-    .default('postgresql://linkpilot:linkpilot@localhost:5432/linkpilot'),
-  REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
+    .default('postgresql://USER:PASSWORD@HOST-pooler.REGION.aws.neon.tech/DATABASE?sslmode=require'),
   BETTER_AUTH_SECRET: z
     .string()
     .min(16)
@@ -32,7 +31,6 @@ const envSchema = z.object({
   /** AI streaming request timeout (ms). */
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
   UPLOAD_DIR: z.string().default('uploads'),
-  REDIS_CACHE_TTL: z.coerce.number().int().nonnegative().default(30),
   TRUST_PROXY: z.coerce.boolean().default(true),
 });
 

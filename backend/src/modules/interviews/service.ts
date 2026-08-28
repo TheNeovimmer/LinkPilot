@@ -1,6 +1,5 @@
 import { ApiError } from '../../utils/ApiError.js';
 import { auditService } from '../audit/service.js';
-import { cacheDel } from '../../database/redis.js';
 import { notificationService } from '../notifications/service.js';
 import { prisma } from '../../database/prisma.js';
 import type { InterviewDTO } from './types.js';
@@ -32,7 +31,6 @@ export class InterviewService {
     if (interview.applicationId) {
       await prisma.application.updateMany({ where: { id: interview.applicationId, userId }, data: { status: 'INTERVIEWING' } });
     }
-    await cacheDel(`dashboard:${userId}`, `jobs:stats:${userId}`, `applications:pipeline:${userId}`);
   }
 
   async create(userId: string, data: Parameters<InterviewRepository['create']>[1]): Promise<InterviewDTO> {
@@ -45,7 +43,6 @@ export class InterviewService {
       body: interview.companyName ?? undefined,
       data: { interviewId: interview.id, scheduledAt: interview.scheduledAt.toISOString() },
     });
-    await cacheDel(`dashboard:${userId}`);
     await auditService.log(userId, 'interview.create', 'interview', interview.id, { title: interview.title });
     return interview;
   }
@@ -72,7 +69,6 @@ export class InterviewService {
         data: { interviewId: result.id },
       });
     }
-    await cacheDel(`dashboard:${userId}`);
     await auditService.log(userId, 'interview.update', 'interview', id);
     return result;
   }
@@ -80,7 +76,6 @@ export class InterviewService {
   async remove(userId: string, id: string): Promise<void> {
     await this.get(userId, id);
     await this.repo.remove(userId, id);
-    await cacheDel(`dashboard:${userId}`);
     await auditService.log(userId, 'interview.delete', 'interview', id);
   }
 }
