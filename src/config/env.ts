@@ -3,15 +3,15 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Load backend/.env (or root .env when running from the repo root).
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+// Load .env from the repo root (and the current working dir as a fallback).
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 dotenv.config({ path: path.join(rootDir, '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(4000),
-  CLIENT_URL: z.string().url().default('http://localhost:5173'),
+  /** Public URL of the app (used for auth links / cookies behind a proxy). */
+  BETTER_AUTH_URL: z.string().url().default('http://localhost:3000'),
   DATABASE_URL: z
     .string()
     .min(1)
@@ -20,8 +20,6 @@ const envSchema = z.object({
     .string()
     .min(16)
     .default('linkpilot-dev-secret-change-me-0000000000000000'),
-  /** Public URL of the app (used for auth links / cookies behind a proxy). */
-  BETTER_AUTH_URL: z.string().url().default('http://localhost:5173'),
   /** OpenAI-compatible endpoint. OpenCode Zen free models work out of the box. */
   AI_BASE_URL: z.string().url().default('https://opencode.ai/zen/v1'),
   AI_API_KEY: z.string().optional(),

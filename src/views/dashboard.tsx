@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/common/empty-state';
+import { Reveal } from '@/components/common/reveal';
 import { formatDateTime, timeAgo } from '@/lib/format';
 import { CONVERSATION_STATUS_META, StatusBadge } from '@/components/common/status-badge';
 import { useUI } from '@/stores/ui';
@@ -77,26 +78,29 @@ export function DashboardPage() {
       ) : null}
 
       {/* Stat grid */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[92px] rounded-[var(--radius-card)]" />)
-        ) : (
-          <>
-            <StatCard label="Conversations" value={stats?.conversations.active ?? 0} icon={MessageSquare} hint={`${stats?.conversations.total ?? 0} total`} onClick={() => undefined} />
-            <StatCard label="Active applications" value={applyTotal} icon={Send} accent="accent" hint={`${stats?.jobs.total ?? 0} jobs tracked`} />
-            <StatCard label="Recruiters" value={stats?.recruiters.total ?? 0} icon={Users} hint={`${stats?.recruiters.INTERVIEW_SCHEDULED ?? 0} in interviews`} />
-            <StatCard
-              label="Avg fit score"
-              value={stats?.jobs.avgFitScore != null ? `${Math.round(stats.jobs.avgFitScore)}` : '—'}
-              icon={Sparkles}
-              accent="warning"
-              hint={jobStats ? `${jobStats.analyzed} jobs analyzed` : undefined}
-            />
-          </>
-        )}
-      </div>
+      <Reveal delay={0.05}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[92px] rounded-[var(--radius-card)]" />)
+          ) : (
+            <>
+              <StatCard label="Conversations" value={stats?.conversations.active ?? 0} icon={MessageSquare} hint={`${stats?.conversations.total ?? 0} total`} onClick={() => undefined} />
+              <StatCard label="Active applications" value={applyTotal} icon={Send} accent="accent" hint={`${stats?.jobs.total ?? 0} jobs tracked`} />
+              <StatCard label="Recruiters" value={stats?.recruiters.total ?? 0} icon={Users} hint={`${stats?.recruiters.INTERVIEW_SCHEDULED ?? 0} in interviews`} />
+              <StatCard
+                label="Avg fit score"
+                value={stats?.jobs.avgFitScore != null ? `${Math.round(stats.jobs.avgFitScore)}` : '—'}
+                icon={Sparkles}
+                accent="warning"
+                hint={jobStats ? `${jobStats.analyzed} jobs analyzed` : undefined}
+              />
+            </>
+          )}
+        </div>
+      </Reveal>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <Reveal delay={0.1}>
+        <div className="grid gap-4 lg:grid-cols-3">
         {/* Upcoming interviews */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between">
@@ -196,9 +200,11 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      </Reveal>
 
       {/* Job pipeline summary */}
-      <Card>
+      <Reveal delay={0.15}>
+        <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
@@ -236,6 +242,7 @@ export function DashboardPage() {
           )}
         </CardContent>
       </Card>
+      </Reveal>
 
       {/* Due reminders strip */}
       {stats && stats.reminders.overdue + stats.reminders.dueNext48h > 0 ? (

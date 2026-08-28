@@ -1,19 +1,8 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
-import './globals.css';
+import '@/globals.css';
 import { Providers } from '@/components/providers';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 export const metadata: Metadata = {
   title: 'LinkPilot',
@@ -22,8 +11,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="h-full bg-background">
+    <html lang="en" className="h-full antialiased">
+      <body className="h-full bg-background text-text">
         <Providers>{children}</Providers>
       </body>
     </html>

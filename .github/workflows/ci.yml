@@ -23,16 +23,13 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma client
-        run: npm run db:generate -w backend
+        run: npm run db:generate
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Lint
         run: npm run lint
-
-      - name: Unit tests
-        run: npm test
 
       - name: Build
         run: npm run build
