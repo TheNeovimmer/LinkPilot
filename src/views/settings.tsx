@@ -14,6 +14,7 @@ import { PageHeader } from '@/components/common/page-header';
 import { useSession } from '@/stores/session';
 import { toast } from 'sonner';
 import type { Profile } from '@/types';
+import { PreferencesCard } from '@/components/settings/preferences-card';
 
 const TONES = [
   { value: 'professional', label: 'Professional' },
@@ -244,6 +245,8 @@ export function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <PreferencesCard />
 
       <Card>
         <CardHeader>

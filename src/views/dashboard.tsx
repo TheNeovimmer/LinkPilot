@@ -22,11 +22,13 @@ import { Reveal } from '@/components/common/reveal';
 import { formatDateTime, timeAgo } from '@/lib/format';
 import { CONVERSATION_STATUS_META, StatusBadge } from '@/components/common/status-badge';
 import { useUI } from '@/stores/ui';
+import { useLocale } from '@/stores/locale';
 import type { DashboardStats } from '@/types';
 
 export function DashboardPage() {
   const aiNoticeDismissed = useUI((s) => s.aiNoticeDismissed);
   const dismissAiNotice = useUI((s) => s.dismissAiNotice);
+  const t = useLocale((s) => s.t);
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard'],
@@ -52,14 +54,14 @@ export function DashboardPage() {
       {/* Greeting */}
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">Overview</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">{t('dashboard.overview')}</p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-text">
-            {profile?.displayName ? `Welcome back, ${profile.displayName.split(' ')[0]}` : 'Welcome back'}
+            {profile?.displayName ? t('dashboard.welcomeName', { name: profile.displayName.split(' ')[0] }) : t('dashboard.welcome')}
           </h1>
           <p className="mt-0.5 text-[13px] text-text-muted">
             {stats?.interviews.upcoming.length
-              ? `Your next interview is ${formatDateTime(stats.interviews.upcoming[0]?.scheduledAt)}.`
-              : 'No interviews on the horizon — keep the pipeline moving.'}
+              ? t('dashboard.nextInterview', { date: formatDateTime(stats.interviews.upcoming[0]?.scheduledAt) })
+              : t('dashboard.noInterviews')}
           </p>
         </div>
       </div>
@@ -68,11 +70,10 @@ export function DashboardPage() {
         <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-warning/30 bg-warning-muted px-4 py-3">
           <AlertCircle className="h-4 w-4 shrink-0 text-warning" strokeWidth={1.75} />
           <p className="flex-1 text-[13px] text-text-secondary">
-            AI drafting is not configured. Set <span className="font-mono text-[12px] text-warning">AI_API_KEY</span> (OpenCode Zen works
-            out of the box) in the backend environment to enable drafts, job analysis and interview prep.
+            {t('dashboard.aiNotice', { key: 'AI_API_KEY' })}
           </p>
           <button onClick={dismissAiNotice} className="text-[12px] text-text-muted transition-colors hover:text-text cursor-pointer">
-            Dismiss
+            {t('dashboard.dismiss')}
           </button>
         </div>
       ) : null}
@@ -84,15 +85,15 @@ export function DashboardPage() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[92px] rounded-[var(--radius-card)]" />)
           ) : (
             <>
-              <StatCard label="Conversations" value={stats?.conversations.active ?? 0} icon={MessageSquare} hint={`${stats?.conversations.total ?? 0} total`} onClick={() => undefined} />
-              <StatCard label="Active applications" value={applyTotal} icon={Send} accent="accent" hint={`${stats?.jobs.total ?? 0} jobs tracked`} />
-              <StatCard label="Recruiters" value={stats?.recruiters.total ?? 0} icon={Users} hint={`${stats?.recruiters.INTERVIEW_SCHEDULED ?? 0} in interviews`} />
+              <StatCard label={t('dashboard.stat.conversations')} value={stats?.conversations.active ?? 0} icon={MessageSquare} hint={t('dashboard.stat.total', { n: stats?.conversations.total ?? 0 })} onClick={() => undefined} />
+              <StatCard label={t('dashboard.stat.activeApps')} value={applyTotal} icon={Send} accent="accent" hint={t('dashboard.stat.jobsTracked', { n: stats?.jobs.total ?? 0 })} />
+              <StatCard label={t('dashboard.stat.recruiters')} value={stats?.recruiters.total ?? 0} icon={Users} hint={t('dashboard.stat.inInterviews', { n: stats?.recruiters.INTERVIEW_SCHEDULED ?? 0 })} />
               <StatCard
-                label="Avg fit score"
+                label={t('dashboard.stat.avgFit')}
                 value={stats?.jobs.avgFitScore != null ? `${Math.round(stats.jobs.avgFitScore)}` : '—'}
                 icon={Sparkles}
                 accent="warning"
-                hint={jobStats ? `${jobStats.analyzed} jobs analyzed` : undefined}
+                hint={jobStats ? t('dashboard.stat.analyzed', { n: jobStats.analyzed }) : undefined}
               />
             </>
           )}
@@ -106,10 +107,10 @@ export function DashboardPage() {
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <CalendarClock className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
-              Upcoming interviews
+              {t('dashboard.upcomingInterviews')}
             </CardTitle>
             <Link href="/interviews" className="flex items-center gap-0.5 text-[12px] text-accent transition-colors hover:text-accent-strong">
-              All <ArrowUpRight className="h-3 w-3" strokeWidth={1.75} />
+              {t('dashboard.all')} <ArrowUpRight className="h-3 w-3" strokeWidth={1.75} />
             </Link>
           </CardHeader>
           <CardContent>
@@ -127,9 +128,9 @@ export function DashboardPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-medium text-text">{i.title}</p>
-                      <p className="truncate text-[11.5px] text-text-muted">{i.companyName ?? 'No company'}</p>
+                      <p className="truncate text-[11.5px] text-text-muted">{i.companyName ?? t('common.noCompany')}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-end">
                       <p className="font-mono text-[12px] text-text-secondary">{formatDateTime(i.scheduledAt)}</p>
                       <p className="font-mono text-[10px] uppercase tracking-wide text-text-muted">{i.mode}</p>
                     </div>
@@ -139,11 +140,11 @@ export function DashboardPage() {
             ) : (
               <EmptyState
                 icon={CalendarClock}
-                title="Nothing scheduled"
-                description="Interviews you schedule will show up here with AI prep."
+                title={t('dashboard.interview.nothing')}
+                description={t('dashboard.interview.empty')}
                 action={
                   <Link href="/interviews?new=1" className="text-[12.5px] text-accent hover:underline">
-                    Schedule an interview
+                    {t('dashboard.interview.schedule')}
                   </Link>
                 }
               />
@@ -156,10 +157,10 @@ export function DashboardPage() {
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
-              Recent conversations
+              {t('dashboard.recentConversations')}
             </CardTitle>
             <Link href="/conversations" className="flex items-center gap-0.5 text-[12px] text-accent transition-colors hover:text-accent-strong">
-              All <ArrowUpRight className="h-3 w-3" strokeWidth={1.75} />
+              {t('dashboard.all')} <ArrowUpRight className="h-3 w-3" strokeWidth={1.75} />
             </Link>
           </CardHeader>
           <CardContent>
@@ -179,7 +180,7 @@ export function DashboardPage() {
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-medium text-text">{c.contactName}</p>
-                      <p className="font-mono text-[10.5px] text-text-muted">{timeAgo(c.lastMessageAt)} · {c.messageCount} msgs</p>
+                      <p className="font-mono text-[10.5px] text-text-muted">{timeAgo(c.lastMessageAt)} · {t('common.msgs', { n: c.messageCount })}</p>
                     </div>
                     <StatusBadge status={c.status} meta={CONVERSATION_STATUS_META} />
                   </Link>
@@ -188,11 +189,11 @@ export function DashboardPage() {
             ) : (
               <EmptyState
                 icon={MessageSquare}
-                title="No conversations yet"
-                description="Track recruiter and hiring-manager chats here."
+                title={t('dashboard.conv.none')}
+                description={t('dashboard.conv.empty')}
                 action={
                   <Link href="/conversations?new=1" className="text-[12.5px] text-accent hover:underline">
-                    Start one
+                    {t('dashboard.conv.start')}
                   </Link>
                 }
               />
@@ -208,10 +209,10 @@ export function DashboardPage() {
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
-            Job pipeline
+            {t('dashboard.jobPipeline')}
           </CardTitle>
           <Link href="/jobs" className="flex items-center gap-0.5 text-[12px] text-accent transition-colors hover:text-accent-strong">
-            All jobs <ArrowUpRight className="h-3 w-3" strokeWidth={1.75} />
+            {t('dashboard.allJobs')} <ArrowUpRight className="h-3 w-3" strokeWidth={1.75} />
           </Link>
         </CardHeader>
         <CardContent>
@@ -220,22 +221,22 @@ export function DashboardPage() {
           ) : jobCount === 0 ? (
             <EmptyState
               icon={Briefcase}
-              title="Track your first job"
-              description="Add roles you're watching, applying to, or interviewing for — the AI can analyze fit for each one."
+              title={t('dashboard.job.none')}
+              description={t('dashboard.job.empty')}
             />
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
               {([
-                ['WATCHLIST', 'Watchlist'],
-                ['APPLIED', 'Applied'],
-                ['INTERVIEWING', 'Interviewing'],
-                ['OFFER', 'Offer'],
-                ['REJECTED', 'Rejected'],
-                ['CLOSED', 'Closed'],
-              ] as const).map(([key, label]) => (
+                ['WATCHLIST', 'job.status.WATCHLIST'],
+                ['APPLIED', 'job.status.APPLIED'],
+                ['INTERVIEWING', 'job.status.INTERVIEWING'],
+                ['OFFER', 'job.status.OFFER'],
+                ['REJECTED', 'job.status.REJECTED'],
+                ['CLOSED', 'job.status.CLOSED'],
+              ] as const).map(([key, labelKey]) => (
                 <div key={key} className="rounded-[var(--radius-control)] border border-border bg-surface-2 px-3 py-2.5">
                   <p className="font-mono text-lg leading-none text-text">{(stats?.jobs[key] as number) ?? 0}</p>
-                  <p className="mt-1 text-[11px] text-text-muted">{label}</p>
+                  <p className="mt-1 text-[11px] text-text-muted">{t(labelKey)}</p>
                 </div>
               ))}
             </div>
@@ -248,14 +249,14 @@ export function DashboardPage() {
       {stats && stats.reminders.overdue + stats.reminders.dueNext48h > 0 ? (
         <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-warning/30 bg-warning-muted px-4 py-3">
           <Badge variant="warning" className="shrink-0">
-            {stats.reminders.overdue + stats.reminders.dueNext48h} due
+            {t('dashboard.reminders.due', { n: stats.reminders.overdue + stats.reminders.dueNext48h })}
           </Badge>
           <p className="text-[13px] text-text-secondary">
             {stats.reminders.overdue > 0 ? `${stats.reminders.overdue} overdue, ` : ''}
-            {stats.reminders.dueNext48h} due in the next 48 hours.
+            {t('dashboard.reminders.body', { n: stats.reminders.dueNext48h })}.
           </p>
-          <Link href="/reminders" className="ml-auto shrink-0 text-[12.5px] text-warning hover:underline">
-            View reminders
+          <Link href="/reminders" className="ms-auto shrink-0 text-[12.5px] text-warning hover:underline">
+            {t('dashboard.reminders.view')}
           </Link>
         </div>
       ) : null}

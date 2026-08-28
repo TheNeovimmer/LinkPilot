@@ -16,6 +16,7 @@ import { JOB_STATUS_META, StatusBadge } from '@/components/common/status-badge';
 import { JobFormDialog } from '@/components/jobs/job-form';
 import { JobAnalyzeDialog } from '@/components/jobs/job-analyze';
 import { JobImportDialog } from '@/components/jobs/job-import';
+import { useLocale } from '@/stores/locale';
 import { cn } from '@/lib/utils';
 import { formatSalary, timeAgo } from '@/lib/format';
 import { toast } from 'sonner';
@@ -25,6 +26,7 @@ const STATUS_TABS = ['', 'WATCHLIST', 'APPLIED', 'INTERVIEWING', 'OFFER', 'REJEC
 const BULK_TARGETS = ['APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'CLOSED'] as const;
 
 export function JobsPage() {
+  const t = useLocale((s) => s.t);
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [q, setQ] = useState('');
@@ -66,7 +68,9 @@ export function JobsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success(`Moved ${selected.size} job${selected.size === 1 ? '' : 's'} to ${JOB_STATUS_META[bulkStatus]?.label ?? bulkStatus}`);
+      toast.success(
+        t('jobs.bulkMoved', { n: selected.size, status: JOB_STATUS_META[bulkStatus]?.labelKey ? t(JOB_STATUS_META[bulkStatus]?.labelKey) : bulkStatus }),
+      );
       setSelected(new Set());
     },
     onError: (err) => toast.error(apiErrorMessage(err)),
@@ -135,7 +139,7 @@ export function JobsPage() {
               status === s ? 'border-accent-border bg-accent-muted text-accent' : 'border-border text-text-muted hover:text-text-secondary',
             )}
           >
-            {s === '' ? 'All' : JOB_STATUS_META[s]?.label ?? s}
+            {s === '' ? t('common.all') : (JOB_STATUS_META[s] ? t(JOB_STATUS_META[s].labelKey) : s)}
           </button>
         ))}
       </div>
@@ -152,7 +156,7 @@ export function JobsPage() {
           >
             {BULK_TARGETS.map((s) => (
               <option key={s} value={s}>
-                {JOB_STATUS_META[s]?.label ?? s}
+                {JOB_STATUS_META[s] ? t(JOB_STATUS_META[s].labelKey) : s}
               </option>
             ))}
           </select>
@@ -174,7 +178,7 @@ export function JobsPage() {
         </div>
       ) : data?.items.length ? (
         <div className="overflow-hidden rounded-[var(--radius-card)] border border-border">
-          <div className="divide-y divide-border/60 bg-[#0c0c0f]">
+          <div className="divide-y divide-border/60 bg-surface">
             {data.items.map((job) => (
               <div key={job.id} className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-2/40">
                 <button

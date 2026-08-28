@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Field } from '@/components/common/field';
 import { RECRUITER_STATUS_META } from '@/components/common/status-badge';
+import { useLocale } from '@/stores/locale';
 import { toast } from 'sonner';
 import type { Recruiter } from '@/types';
 
@@ -33,6 +34,7 @@ export function RecruiterFormDialog({
   onOpenChange: (v: boolean) => void;
   recruiter: Recruiter | null;
 }) {
+  const t = useLocale((s) => s.t);
   const queryClient = useQueryClient();
   const isEdit = Boolean(recruiter);
   const { data: companies } = useQuery({
@@ -130,7 +132,7 @@ export function RecruiterFormDialog({
             <select {...register('status')} className="h-9 w-full rounded-[var(--radius-control)] border border-border bg-surface-2 px-3 text-sm text-text focus:border-accent-border focus:outline-none">
               {Object.entries(RECRUITER_STATUS_META).map(([value, meta]) => (
                 <option key={value} value={value}>
-                  {meta.label}
+                  {t(meta.labelKey)}
                 </option>
               ))}
             </select>

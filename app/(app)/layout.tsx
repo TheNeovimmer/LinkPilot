@@ -48,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {sidebarOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
-          <div className="absolute inset-y-0 left-0 animate-in slide-in-from-left duration-200">
+          <div className="absolute inset-y-0 start-0 animate-in slide-in-from-start duration-200">
             <Sidebar />
           </div>
         </div>

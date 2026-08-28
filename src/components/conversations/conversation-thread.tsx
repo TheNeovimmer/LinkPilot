@@ -160,9 +160,9 @@ export function ConversationThread({ conversation, onEdit, onDeleted }: Conversa
         ) : null}
         {isLoading ? (
           <div className="space-y-3">
-            <Skeleton className="ml-auto h-14 w-2/3 rounded-[var(--radius-card)]" />
+            <Skeleton className="ms-auto h-14 w-2/3 rounded-[var(--radius-card)]" />
             <Skeleton className="h-14 w-2/3 rounded-[var(--radius-card)]" />
-            <Skeleton className="ml-auto h-20 w-3/5 rounded-[var(--radius-card)]" />
+            <Skeleton className="ms-auto h-20 w-3/5 rounded-[var(--radius-card)]" />
           </div>
         ) : messages?.length ? (
           <>

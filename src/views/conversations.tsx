@@ -28,7 +28,7 @@ export function ConversationsPage() {
   });
 
   return (
-    <div className="flex h-[calc(100dvh-7.5rem)] min-h-[480px] overflow-hidden rounded-[var(--radius-card)] border border-border bg-[#0c0c0f]">
+    <div className="flex h-[calc(100dvh-7.5rem)] min-h-[480px] overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
       {/* List pane */}
       <div className={cn(id ? 'hidden lg:flex' : 'flex', 'w-full flex-col lg:w-[340px] lg:shrink-0 lg:border-r lg:border-border')}>
         <div className="flex items-center justify-between border-b border-border px-3 py-2.5">

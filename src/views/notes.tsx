@@ -99,7 +99,7 @@ export function NotesPage() {
           {data.map((note) => (
             <div
               key={note.id}
-              className="group flex cursor-pointer flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-[#0c0c0f] p-4 transition-colors hover:border-border-strong"
+              className="group flex cursor-pointer flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:border-border-strong"
               onClick={() => { setEditing(note); setFormOpen(true); }}
             >
               <div className="flex items-start justify-between gap-2">

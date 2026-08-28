@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { LogOut, Settings, User } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,11 +11,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useSession } from '@/stores/session';
+import { useLocale } from '@/stores/locale';
 import { initials } from '@/lib/utils';
 
 export function UserMenu() {
   const user = useSession((s) => s.user);
   const logout = useSession((s) => s.logout);
+  const t = useLocale((s) => s.t);
   const router = useRouter();
 
   return (
@@ -33,11 +35,7 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push('/settings')}>
           <Settings className="h-3.5 w-3.5" strokeWidth={1.75} />
-          Settings
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push('/settings')}>
-          <User className="h-3.5 w-3.5" strokeWidth={1.75} />
-          Profile
+          {t('user.account')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -48,7 +46,7 @@ export function UserMenu() {
           }}
         >
           <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
-          Sign out
+          {t('user.signOut')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

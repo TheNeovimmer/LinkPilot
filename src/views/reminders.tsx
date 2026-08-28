@@ -100,7 +100,7 @@ export function RemindersPage() {
           {data.map((r) => {
             const overdue = tab === 'pending' && new Date(r.dueAt).getTime() < now;
             return (
-              <div key={r.id} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-[#0c0c0f] px-4 py-3">
+              <div key={r.id} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface px-4 py-3">
                 <button
                   onClick={() => toggleDone.mutate(r)}
                   className={cn(

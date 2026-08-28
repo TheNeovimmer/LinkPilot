@@ -12,22 +12,24 @@ import { PageHeader } from '@/components/common/page-header';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { APPLICATION_STATUS_META } from '@/components/common/status-badge';
 import { ApplicationFormDialog } from '@/components/applications/application-form';
+import { useLocale } from '@/stores/locale';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import type { Application } from '@/types';
 
-const PIPELINE: { key: string; label: string }[] = [
-  { key: 'DRAFT', label: 'Draft' },
-  { key: 'SUBMITTED', label: 'Submitted' },
-  { key: 'UNDER_REVIEW', label: 'Under review' },
-  { key: 'INTERVIEWING', label: 'Interviewing' },
-  { key: 'OFFER', label: 'Offer' },
-  { key: 'REJECTED', label: 'Rejected' },
-  { key: 'WITHDRAWN', label: 'Withdrawn' },
+const PIPELINE: { key: string; labelKey: string }[] = [
+  { key: 'DRAFT', labelKey: 'app.status.DRAFT' },
+  { key: 'SUBMITTED', labelKey: 'app.status.SUBMITTED' },
+  { key: 'UNDER_REVIEW', labelKey: 'app.status.UNDER_REVIEW' },
+  { key: 'INTERVIEWING', labelKey: 'app.status.INTERVIEWING' },
+  { key: 'OFFER', labelKey: 'app.status.OFFER' },
+  { key: 'REJECTED', labelKey: 'app.status.REJECTED' },
+  { key: 'WITHDRAWN', labelKey: 'app.status.WITHDRAWN' },
 ];
 
 export function ApplicationsPage() {
+  const t = useLocale((s) => s.t);
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [status, setStatus] = useState('');
@@ -85,11 +87,11 @@ export function ApplicationsPage() {
             onClick={() => setStatus(status === stage.key ? '' : stage.key)}
             className={cn(
               'rounded-[var(--radius-control)] border px-2 py-2.5 text-center transition-colors cursor-pointer',
-              status === stage.key ? 'border-accent-border bg-accent-muted' : 'border-border bg-[#0c0c0f] hover:border-border-strong',
+              status === stage.key ? 'border-accent-border bg-accent-muted' : 'border-border bg-surface hover:border-border-strong',
             )}
           >
             <p className="font-mono text-[15px] leading-none text-text">{(stats?.byStatus?.[stage.key] as number) ?? 0}</p>
-            <p className="mt-1 truncate text-[10.5px] text-text-muted">{stage.label}</p>
+            <p className="mt-1 truncate text-[10.5px] text-text-muted">{t(stage.labelKey)}</p>
           </button>
         ))}
       </div>
@@ -102,7 +104,7 @@ export function ApplicationsPage() {
         </div>
       ) : data?.length ? (
         <div className="overflow-hidden rounded-[var(--radius-card)] border border-border">
-          <div className="divide-y divide-border/60 bg-[#0c0c0f]">
+          <div className="divide-y divide-border/60 bg-surface">
             {data.map((app) => (
               <div key={app.id} className="flex items-center gap-4 px-4 py-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-surface-2 ring-1 ring-border">
@@ -124,7 +126,7 @@ export function ApplicationsPage() {
                   >
                     {Object.entries(APPLICATION_STATUS_META).map(([value, meta]) => (
                       <option key={value} value={value}>
-                        {meta.label}
+                        {t(meta.labelKey)}
                       </option>
                     ))}
                   </select>

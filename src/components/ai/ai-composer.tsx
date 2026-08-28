@@ -144,7 +144,7 @@ export function AiComposer({ conversationId, onMessageInserted }: AiComposerProp
   };
 
   return (
-    <div className="flex flex-col gap-2 border-t border-border bg-[#0c0c0f] p-3">
+    <div className="flex flex-col gap-2 border-t border-border bg-surface p-3">
       {/* AI draft panel */}
       {draftOpen ? (
         <div className="rounded-[var(--radius-card)] border border-accent-border bg-accent-muted/60">

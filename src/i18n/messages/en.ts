@@ -1,0 +1,191 @@
+import type { Messages } from '../types';
+
+/**
+ * English (source of truth). All other locales share these keys; missing keys
+ * fall back to English.
+ */
+export const messages: Messages = {
+  // Brand
+  'brand.name': 'LinkPilot',
+  'brand.tagline': 'career copilot',
+
+  // Navigation
+  'nav.dashboard': 'Dashboard',
+  'nav.conversations': 'Conversations',
+  'nav.jobs': 'Jobs',
+  'nav.applications': 'Applications',
+  'nav.recruiters': 'Recruiters',
+  'nav.companies': 'Companies',
+  'nav.interviews': 'Interviews',
+  'nav.notes': 'Notes',
+  'nav.reminders': 'Reminders',
+  'nav.activity': 'Activity',
+  'nav.settings': 'Settings',
+
+  // Topbar
+  'topbar.search': 'Search…',
+  'topbar.newConversation': 'New conversation',
+
+  // User menu
+  'user.signOut': 'Sign out',
+  'user.theme': 'Theme',
+  'user.theme.dark': 'Dark',
+  'user.theme.light': 'Light',
+  'user.theme.system': 'System',
+  'user.language': 'Language',
+  'user.account': 'Account settings',
+
+  // Login
+  'login.brandSub': 'Your private AI career copilot',
+  'login.signIn': 'Sign in',
+  'login.createAccount': 'Create account',
+  'login.email': 'Email',
+  'login.password': 'Password',
+  'login.name': 'Name',
+  'login.passwordHint': 'At least 8 characters',
+  'login.submit.signIn': 'Sign in',
+  'login.submit.signUp': 'Create account',
+  'login.privacy': 'Single-user workspace. Your data stays in your own database.',
+  'login.demoHint': 'Demo? Seed the database ({cmd}) then use',
+  'login.signingIn': '…',
+
+  // Dashboard
+  'dashboard.overview': 'Overview',
+  'dashboard.welcome': 'Welcome back',
+  'dashboard.welcomeName': 'Welcome back, {name}',
+  'dashboard.nextInterview': 'Your next interview is {date}.',
+  'dashboard.noInterviews': 'No interviews on the horizon — keep the pipeline moving.',
+  'dashboard.aiNotice': 'AI drafting is not configured. Set {key} (OpenCode Zen works out of the box) to enable drafts, job analysis and interview prep.',
+  'dashboard.dismiss': 'Dismiss',
+  'dashboard.stat.conversations': 'Conversations',
+  'dashboard.stat.total': '{n} total',
+  'dashboard.stat.activeApps': 'Active applications',
+  'dashboard.stat.jobsTracked': '{n} jobs tracked',
+  'dashboard.stat.recruiters': 'Recruiters',
+  'dashboard.stat.inInterviews': '{n} in interviews',
+  'dashboard.stat.avgFit': 'Avg fit score',
+  'dashboard.stat.analyzed': '{n} jobs analyzed',
+  'dashboard.upcomingInterviews': 'Upcoming interviews',
+  'dashboard.all': 'All',
+  'dashboard.recentConversations': 'Recent conversations',
+  'dashboard.jobPipeline': 'Job pipeline',
+  'dashboard.allJobs': 'All jobs',
+  'dashboard.interview.title': 'No company',
+  'dashboard.interview.nothing': 'Nothing scheduled',
+  'dashboard.interview.empty': "Interviews you schedule will show up here with AI prep.",
+  'dashboard.interview.schedule': 'Schedule an interview',
+  'dashboard.conv.none': 'No conversations yet',
+  'dashboard.conv.empty': 'Track recruiter and hiring-manager chats here.',
+  'dashboard.conv.start': 'Start one',
+  'dashboard.job.none': 'Track your first job',
+  'dashboard.job.empty': "Add roles you're watching, applying to, or interviewing for — the AI can analyze fit for each one.",
+  'dashboard.pipeline.watchlist': 'Watchlist',
+  'dashboard.pipeline.applied': 'Applied',
+  'dashboard.pipeline.interviewing': 'Interviewing',
+  'dashboard.pipeline.offer': 'Offer',
+  'dashboard.pipeline.rejected': 'Rejected',
+  'dashboard.pipeline.closed': 'Closed',
+  'dashboard.reminders.due': '{n} due',
+  'dashboard.reminders.body': '{n} due in the next 48 hours.',
+  'dashboard.reminders.view': 'View reminders',
+
+  // Generic
+  'common.loading': 'Loading…',
+  'common.delete': 'Delete',
+  'common.cancel': 'Cancel',
+  'common.save': 'Save',
+  'common.edit': 'Edit',
+  'common.add': 'Add',
+  'common.search': 'Search',
+  'common.all': 'All',
+  'common.notSpecified': 'Not specified',
+  'common.noCompany': 'No company',
+  'common.timeAgo.justNow': 'just now',
+  'common.timeAgo.m': '{n}m',
+  'common.timeAgo.h': '{n}h',
+  'common.timeAgo.d': '{n}d',
+  'common.msgs': '{n} msgs',
+  'common.from': 'from',
+  'common.upTo': 'up to',
+  'common.currency.usd': 'USD',
+  'common.currency.tnd': 'TND',
+  'common.timeAgo.day1': '{n} day',
+  'common.timeAgo.day2': '{n} days',
+  'common.timeAgo.day3': '{n} days',
+
+  // Settings
+  'settings.profile': 'Profile',
+  'settings.preferences': 'Preferences',
+  'settings.general': 'General',
+  'settings.general.desc': 'Language, theme, and display preferences.',
+  'settings.language': 'Interface language',
+  'settings.theme': 'Theme',
+  'settings.theme.dark': 'Dark',
+  'settings.theme.light': 'Light',
+  'settings.theme.system': 'Match system',
+  'settings.currency': 'Salary currency',
+  'settings.currency.desc': 'Tunisian Dinar (TND) is supported.',
+  'settings.save': 'Save changes',
+  'settings.saved': 'Saved',
+  'settings.danger': 'Danger zone',
+  'settings.danger.desc': 'Permanently delete your account and all data.',
+  'settings.deleteAccount': 'Delete account',
+  'settings.export': 'Export my data',
+  'settings.aiSection': 'AI',
+  'settings.ai.desc': 'OpenAI-compatible endpoint is used for drafting, job analysis and interview prep.',
+
+  // Interviews
+  'interview.mode.phone': 'Phone',
+  'interview.mode.video': 'Video',
+  'interview.mode.onsite': 'On-site',
+  'interview.mode.technical': 'Technical',
+
+  // Job statuses
+  'jobs.bulkMoved': 'Moved {n} job to {status}',
+  'job.status.WATCHLIST': 'Watchlist',
+  'job.status.APPLIED': 'Applied',
+  'job.status.INTERVIEWING': 'Interviewing',
+  'job.status.OFFER': 'Offer',
+  'job.status.REJECTED': 'Rejected',
+  'job.status.CLOSED': 'Closed',
+
+  // Conversation statuses
+  'conv.status.ACTIVE': 'Active',
+  'conv.status.ARCHIVED': 'Archived',
+
+  // Interview statuses
+  'interview.status.SCHEDULED': 'Scheduled',
+  'interview.status.COMPLETED': 'Completed',
+  'interview.status.CANCELLED': 'Cancelled',
+  'interview.status.RESCHEDULED': 'Rescheduled',
+
+  // Recruiter statuses
+  'recruiter.status.NEW': 'New',
+  'recruiter.status.CONTACTED': 'Contacted',
+  'recruiter.status.RESPONDED': 'Responded',
+  'recruiter.status.INTERVIEW_SCHEDULED': 'Interview scheduled',
+  'recruiter.status.OFFER': 'Offer',
+  'recruiter.status.REJECTED': 'Rejected',
+  'recruiter.status.INACTIVE': 'Inactive',
+
+  // Application statuses
+  'app.status.DRAFT': 'Draft',
+  'app.status.SUBMITTED': 'Submitted',
+  'app.status.UNDER_REVIEW': 'Under review',
+  'app.status.INTERVIEWING': 'Interviewing',
+  'app.status.OFFER': 'Offer',
+  'app.status.REJECTED': 'Rejected',
+  'app.status.WITHDRAWN': 'Withdrawn',
+
+  // Tunisian
+  'tn.currency.tnd': 'TND',
+  'tn.governorates.title': 'Governorate',
+  'tn.jobSources.title': 'Job source',
+  'tn.jobSources.keystones': 'Keystones',
+  'tn.jobSources.tanitjobs': 'TanitJobs',
+  'tn.jobSources.globaltalent': 'Global-Talent',
+  'tn.jobSources.expertee': 'Expertee',
+  'tn.jobSources.tunisiaio': 'Tunisia.io',
+  'tn.jobSources.linkedin': 'LinkedIn',
+  'tn.jobSources.other': 'Other',
+};

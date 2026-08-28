@@ -131,12 +131,12 @@ export function ActivityPage() {
             </option>
           ))}
         </select>
-        <span className="ml-auto font-mono text-[11px] text-text-muted">
+        <span className="ms-auto font-mono text-[11px] text-text-muted">
           {meta ? `${meta.total} entries` : ''}
         </span>
       </div>
 
-      <div className="overflow-hidden rounded-[var(--radius-card)] border border-border bg-[#0c0c0f]">
+      <div className="overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
         {isLoading ? (
           <div className="flex flex-col gap-2 p-4">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -144,13 +144,13 @@ export function ActivityPage() {
             ))}
           </div>
         ) : actions.length ? (
-          <table className="w-full text-left">
+          <table className="w-full text-start">
             <thead>
               <tr className="border-b border-border text-[11px] uppercase tracking-wider text-text-muted">
                 <th className="px-4 py-2.5 font-medium">Action</th>
                 <th className="px-4 py-2.5 font-medium">Entity</th>
                 <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Details</th>
-                <th className="px-4 py-2.5 text-right font-medium">When</th>
+                <th className="px-4 py-2.5 text-end font-medium">When</th>
               </tr>
             </thead>
             <tbody>

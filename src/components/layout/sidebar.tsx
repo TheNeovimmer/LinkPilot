@@ -17,25 +17,27 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/stores/session';
+import { useLocale } from '@/stores/locale';
 import { initials } from '@/lib/utils';
 
 const NAV = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/conversations', label: 'Conversations', icon: MessageSquare },
-  { to: '/jobs', label: 'Jobs', icon: Briefcase },
-  { to: '/applications', label: 'Applications', icon: Send },
-  { to: '/recruiters', label: 'Recruiters', icon: Users },
-  { to: '/companies', label: 'Companies', icon: Building2 },
-  { to: '/interviews', label: 'Interviews', icon: CalendarClock },
-  { to: '/notes', label: 'Notes', icon: StickyNote },
-  { to: '/reminders', label: 'Reminders', icon: Bell },
+  { to: '/dashboard', key: 'nav.dashboard', icon: LayoutDashboard },
+  { to: '/conversations', key: 'nav.conversations', icon: MessageSquare },
+  { to: '/jobs', key: 'nav.jobs', icon: Briefcase },
+  { to: '/applications', key: 'nav.applications', icon: Send },
+  { to: '/recruiters', key: 'nav.recruiters', icon: Users },
+  { to: '/companies', key: 'nav.companies', icon: Building2 },
+  { to: '/interviews', key: 'nav.interviews', icon: CalendarClock },
+  { to: '/notes', key: 'nav.notes', icon: StickyNote },
+  { to: '/reminders', key: 'nav.reminders', icon: Bell },
 ];
 
-const SECONDARY_NAV = [{ to: '/activity', label: 'Activity', icon: History }];
+const SECONDARY_NAV = [{ to: '/activity', key: 'nav.activity', icon: History }];
 
 export function Sidebar() {
   const user = useSession((s) => s.user);
   const pathname = usePathname();
+  const t = useLocale((s) => s.t);
 
   const isActive = (to: string) => {
     if (to === '/dashboard') return pathname === '/dashboard';
@@ -51,38 +53,38 @@ export function Sidebar() {
   const iconClass = (active: boolean) => cn('h-4 w-4', active ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary');
 
   return (
-    <aside className="flex h-full w-[232px] shrink-0 flex-col border-r border-border bg-[#0c0c0f]">
+    <aside className="flex h-full w-[232px] shrink-0 flex-col border-r border-border bg-chrome">
       {/* Brand */}
       <div className="flex h-14 items-center gap-2.5 px-5">
         <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-accent/12 ring-1 ring-accent-border">
           <span className="font-mono text-[13px] font-bold text-accent">L</span>
         </div>
         <div className="flex flex-col leading-none">
-          <span className="text-[13px] font-semibold tracking-tight text-text">LinkPilot</span>
-          <span className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-text-muted">career copilot</span>
+          <span className="text-[13px] font-semibold tracking-tight text-text">{t('brand.name')}</span>
+          <span className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-text-muted">{t('brand.tagline')}</span>
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
-        {NAV.map(({ to, label, icon: Icon }) => {
+        {NAV.map(({ to, key, icon: Icon }) => {
           const active = isActive(to);
           return (
             <Link key={to} href={to} className={navClass(active)}>
               <Icon className={iconClass(active)} strokeWidth={1.75} />
-              {label}
+              {t(key)}
             </Link>
           );
         })}
 
         {/* Secondary nav */}
         <div className="mt-4 space-y-0.5 border-t border-border/60 pt-3">
-          {SECONDARY_NAV.map(({ to, label, icon: Icon }) => {
+          {SECONDARY_NAV.map(({ to, key, icon: Icon }) => {
             const active = isActive(to);
             return (
               <Link key={to} href={to} className={navClass(active)}>
                 <Icon className={iconClass(active)} strokeWidth={1.75} />
-                {label}
+                {t(key)}
               </Link>
             );
           })}
@@ -93,7 +95,7 @@ export function Sidebar() {
       <div className="border-t border-border p-3">
         <Link href="/settings" className={cn('mb-1', navClass(isActive('/settings')))}>
           <Settings className={iconClass(isActive('/settings'))} strokeWidth={1.75} />
-          Settings
+          {t('nav.settings')}
         </Link>
         <div className="flex items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[11px] font-semibold text-text-secondary ring-1 ring-border-strong">

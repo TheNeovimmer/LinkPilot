@@ -2,10 +2,17 @@
 
 /*
  * LinkPilot design tokens.
- * Dark-only product (Cursor-style). One accent: emerald. One radius rule:
+ * Dual-theme product (dark default, light available via data-theme="light").
+ * One accent: emerald. One radius rule:
  * controls 8px, cards 12px, overlays 16px. Geist + Geist Mono.
+ *
+ * Color values are theme-scoped below; the @theme mapping stays identical so
+ * every component that consumes bg-surface / text-text / --radius-* keeps
+ * working without changes across themes.
  */
-:root {
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
   --background: #0a0a0c;
   --surface: #101013;
   --surface-2: #17171b;
@@ -18,19 +25,43 @@
   --accent: #3ddc97;
   --accent-strong: #29c886;
   --accent-ink: #06140e;
-  --accent-muted: rgba(61, 220, 151, 0.1);
-  --accent-border: rgba(61, 220, 151, 0.32);
+  --accent-muted: rgba(61, 220, 151, 0.12);
+  --accent-border: rgba(61, 220, 151, 0.34);
   --destructive: #f2646e;
-  --destructive-muted: rgba(242, 100, 110, 0.1);
+  --destructive-muted: rgba(242, 100, 110, 0.12);
   --warning: #e8b34b;
-  --warning-muted: rgba(232, 179, 75, 0.1);
+  --warning-muted: rgba(232, 179, 75, 0.12);
   --info: #5aa7ff;
-  --info-muted: rgba(90, 167, 255, 0.1);
+  --info-muted: rgba(90, 167, 255, 0.12);
   --violet: #a78bfa;
-  --violet-muted: rgba(167, 139, 250, 0.1);
-  --radius-control: 8px;
-  --radius-card: 12px;
-  --radius-overlay: 16px;
+  --violet-muted: rgba(167, 139, 250, 0.12);
+}
+
+/* Light theme: cool neutral base, same emerald accent, full AA-contrast text. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --background: #f7f7f8;
+  --surface: #ffffff;
+  --surface-2: #f1f1f3;
+  --surface-3: #e8e8ec;
+  --border: #e3e3e8;
+  --border-strong: #c9c9d1;
+  --text: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #8b8b95;
+  --accent: #0f9d6e;
+  --accent-strong: #0b7f58;
+  --accent-ink: #ffffff;
+  --accent-muted: rgba(15, 157, 110, 0.1);
+  --accent-border: rgba(15, 157, 110, 0.35);
+  --destructive: #d93a46;
+  --destructive-muted: rgba(217, 58, 70, 0.1);
+  --warning: #b7791f;
+  --warning-muted: rgba(183, 121, 31, 0.1);
+  --info: #2563eb;
+  --info-muted: rgba(37, 99, 235, 0.1);
+  --violet: #7c3aed;
+  --violet-muted: rgba(124, 58, 237, 0.1);
 }
 
 @theme inline {
@@ -57,6 +88,17 @@
   --radius-overlay: 16px;
 }
 
+/* Sidebar / shell chrome uses a slightly-differentiated base vs. page surface. */
+:root[data-theme='dark'] {
+  --chrome: #0c0c0f;
+}
+:root[data-theme='light'] {
+  --chrome: #f2f2f4;
+}
+@theme inline {
+  --color-chrome: var(--chrome, var(--background));
+}
+
 html,
 body,
 #root {
@@ -66,6 +108,11 @@ body,
 body {
   @apply bg-background text-text font-sans antialiased;
   font-feature-settings: 'cv11', 'ss01';
+}
+
+/* RTL: flip font-feature hack off for Arabic whose glyphs don't use it. */
+html[dir='rtl'] body {
+  font-feature-settings: normal;
 }
 
 ::selection {

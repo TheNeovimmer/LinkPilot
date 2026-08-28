@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Field } from '@/components/common/field';
 import { JOB_STATUS_META } from '@/components/common/status-badge';
+import { useLocale } from '@/stores/locale';
 import { toast } from 'sonner';
 import type { Job } from '@/types';
 
@@ -35,6 +36,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export function JobFormDialog({ open, onOpenChange, job }: { open: boolean; onOpenChange: (v: boolean) => void; job: Job | null }) {
+  const t = useLocale((s) => s.t);
   const queryClient = useQueryClient();
   const isEdit = Boolean(job);
   const { data: companies } = useQuery({
@@ -137,14 +139,14 @@ export function JobFormDialog({ open, onOpenChange, job }: { open: boolean; onOp
           </Field>
           <div className="flex items-center gap-6">
             <label className="flex cursor-pointer items-center gap-2 text-[13px] text-text-secondary">
-              <input type="checkbox" checked={remote} onChange={(e) => setValue('remote', e.target.checked)} className="h-4 w-4 rounded border-border bg-surface-2 accent-[#3ddc97]" />
+              <input type="checkbox" checked={remote} onChange={(e) => setValue('remote', e.target.checked)} className="h-4 w-4 rounded border-border bg-surface-2 accent-accent" />
               Remote
             </label>
             <Field label="Status" className="flex-1">
               <select {...register('status')} className="h-9 w-full rounded-[var(--radius-control)] border border-border bg-surface-2 px-3 text-sm text-text focus:border-accent-border focus:outline-none">
                 {Object.entries(JOB_STATUS_META).map(([value, meta]) => (
                   <option key={value} value={value}>
-                    {meta.label}
+                    {t(meta.labelKey)}
                   </option>
                 ))}
               </select>

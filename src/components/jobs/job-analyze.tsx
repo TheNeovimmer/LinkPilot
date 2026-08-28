@@ -76,13 +76,13 @@ export function JobAnalyzeDialog({ job, onOpenChange }: { job: Job; onOpenChange
             <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-accent-border/50 bg-accent-muted/50 p-4">
               <div className="relative h-16 w-16 shrink-0">
                 <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
-                  <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
+                  <circle cx="32" cy="32" r="26" fill="none" stroke="var(--border-strong)" strokeWidth="6" />
                   <circle
                     cx="32"
                     cy="32"
                     r="26"
                     fill="none"
-                    stroke="#3ddc97"
+                    stroke="var(--accent)"
                     strokeWidth="6"
                     strokeLinecap="round"
                     strokeDasharray={`${(result.fitScore / 100) * 163.4} 163.4`}

@@ -93,7 +93,7 @@ export function NoteFormDialog({
             <Input placeholder="company, salary, culture" {...register('tags')} />
           </Field>
           <label className="flex cursor-pointer items-center gap-2 text-[13px] text-text-secondary">
-            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} className="h-4 w-4 rounded border-border bg-surface-2 accent-[#3ddc97]" />
+            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} className="h-4 w-4 rounded border-border bg-surface-2 accent-accent" />
             Pin to top
           </label>
           <DialogFooter className="mt-2">

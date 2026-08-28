@@ -102,7 +102,7 @@ export function InterviewsPage() {
             const meta = MODE_META[interview.mode] ?? MODE_META.VIDEO;
             const upcoming = tab === 'SCHEDULED' && new Date(interview.scheduledAt).getTime() > now;
             return (
-              <div key={interview.id} className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-[#0c0c0f] px-4 py-3 transition-colors hover:border-border-strong">
+              <div key={interview.id} className="flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface px-4 py-3 transition-colors hover:border-border-strong">
                 <div
                   className={cn(
                     'flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] ring-1 ring-border',

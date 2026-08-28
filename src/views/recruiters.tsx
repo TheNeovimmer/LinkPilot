@@ -65,7 +65,7 @@ export function RecruitersPage() {
       ) : data?.length ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {data.map((r) => (
-            <div key={r.id} className="group flex flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-[#0c0c0f] p-4 transition-colors hover:border-border-strong">
+            <div key={r.id} className="group flex flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:border-border-strong">
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[14px] font-semibold text-text-secondary ring-1 ring-border-strong">
                   {r.name.slice(0, 1).toUpperCase()}

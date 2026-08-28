@@ -8,11 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Field } from '@/components/common/field';
 import { signIn, signUp } from '@/lib/api';
 import { useSession } from '@/stores/session';
+import { useLocale } from '@/stores/locale';
+import { ThemeToggle } from '@/components/layout/theme-toggle';
+import { LanguageSwitcher } from '@/components/layout/language-switcher';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
   const status = useSession((s) => s.status);
   const setUser = useSession((s) => s.setUser);
+  const t = useLocale((s) => s.t);
   const router = useRouter();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [name, setName] = useState('');
@@ -48,6 +52,10 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+      <div className="absolute top-4 end-4 flex items-center gap-1">
+        <LanguageSwitcher />
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-[360px]">
         {/* Brand */}
         <div className="mb-8 flex flex-col items-center gap-3">
@@ -58,7 +66,7 @@ export default function LoginPage() {
             <h1 className="text-lg font-semibold tracking-tight text-text">LinkPilot</h1>
             <p className="mt-1 flex items-center justify-center gap-1.5 text-[13px] text-text-muted">
               <Sparkles className="h-3.5 w-3.5 text-accent" strokeWidth={1.75} />
-              Your private AI career copilot
+              {t('login.brandSub')}
             </p>
           </div>
         </div>
@@ -69,26 +77,26 @@ export default function LoginPage() {
               onClick={() => setMode('signin')}
               className={`rounded-[6px] py-1.5 transition-colors cursor-pointer ${mode === 'signin' ? 'bg-surface-3 text-text' : 'text-text-muted hover:text-text-secondary'}`}
             >
-              Sign in
+              {t('login.signIn')}
             </button>
             <button
               onClick={() => setMode('signup')}
               className={`rounded-[6px] py-1.5 transition-colors cursor-pointer ${mode === 'signup' ? 'bg-surface-3 text-text' : 'text-text-muted hover:text-text-secondary'}`}
             >
-              Create account
+              {t('login.createAccount')}
             </button>
           </div>
 
           <form onSubmit={submit} className="flex flex-col gap-4">
             {mode === 'signup' ? (
-              <Field label="Name">
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="name" />
+              <Field label={t('login.name')}>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('login.name')} autoComplete="name" />
               </Field>
             ) : null}
-            <Field label="Email">
+            <Field label={t('login.email')}>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required />
             </Field>
-            <Field label="Password" hint={mode === 'signup' ? 'At least 8 characters' : undefined}>
+            <Field label={t('login.password')} hint={mode === 'signup' ? t('login.passwordHint') : undefined}>
               <Input
                 type="password"
                 value={password}
@@ -99,19 +107,18 @@ export default function LoginPage() {
               />
             </Field>
             <Button type="submit" disabled={busy || !email || !password} className="mt-1">
-              {busy ? '…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+              {busy ? '…' : mode === 'signin' ? t('login.submit.signIn') : t('login.submit.signUp')}
             </Button>
           </form>
 
           <p className="mt-4 text-center text-[11px] leading-relaxed text-text-muted">
-            Single-user workspace. Your data stays in your own database.
+            {t('login.privacy')}
           </p>
         </div>
 
         {mode === 'signin' ? (
           <p className="mt-4 text-center text-[11.5px] text-text-muted">
-            Demo? Seed the database (<span className="font-mono">npm run db:seed</span>) then use{' '}
-            <span className="font-mono">demo@linkpilot.app</span>
+            {t('login.demoHint', { cmd: 'npm run db:seed' })} <span className="font-mono">demo@linkpilot.app</span>
           </p>
         ) : null}
       </div>

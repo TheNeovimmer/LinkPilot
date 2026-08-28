@@ -62,7 +62,7 @@ export function CompaniesPage() {
       ) : data?.length ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {data.map((c) => (
-            <div key={c.id} className="group flex flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-[#0c0c0f] p-4 transition-colors hover:border-border-strong">
+            <div key={c.id} className="group flex flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:border-border-strong">
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-3 ring-1 ring-border-strong">
                   <Building2 className="h-4.5 w-4.5 text-text-secondary" strokeWidth={1.75} />
