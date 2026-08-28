@@ -82,3 +82,35 @@ export async function signUp(name: string, email: string, password: string): Pro
 export async function signOut(): Promise<void> {
   await fetch('/api/auth/sign-out', { method: 'POST', credentials: 'include' });
 }
+
+// ---------------------------------------------------------------------------
+// AI provider settings (per-user, persisted server-side; key never exposed)
+// ---------------------------------------------------------------------------
+
+export interface AiSettingsView {
+  baseUrl: string;
+  model: string;
+  embeddingModel: string | null;
+  enabled: boolean;
+  hasApiKey: boolean;
+  apiKeyHint: string | null;
+}
+
+/** Sparse patch — only fields present are saved. Empty apiKey = leave unchanged. */
+export interface AiSettingsPatch {
+  baseUrl?: string;
+  model?: string;
+  embeddingModel?: string | null;
+  apiKey?: string;
+  enabled?: boolean;
+}
+
+export async function getAiSettings(): Promise<AiSettingsView> {
+  const res = await api.get('/ai/settings');
+  return unwrap(res);
+}
+
+export async function saveAiSettings(patch: AiSettingsPatch): Promise<AiSettingsView> {
+  const res = await api.put('/ai/settings', patch);
+  return unwrap(res);
+}

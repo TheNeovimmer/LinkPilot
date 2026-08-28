@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { env } from '../../config/env';
 import { ApiError } from '../../utils/ApiError';
 import { extractJson } from '../../utils/ai-json';
 import { logger } from '../../utils/logger';
+import type { AiRuntimeConfig } from './config';
+import { env } from '../../config/env';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -41,18 +42,25 @@ interface SSEChoice {
  * (SSE), function calling, and JSON mode.
  */
 export class AiClient {
-  readonly baseUrl = env.AI_BASE_URL.replace(/\/+$/, '');
-  readonly model = env.AI_MODEL;
+  readonly baseUrl: string;
+  readonly model: string;
+  readonly embeddingModel: string | null;
+
+  constructor(private readonly cfg: AiRuntimeConfig) {
+    this.baseUrl = cfg.baseUrl.replace(/\/+$/, '');
+    this.model = cfg.model;
+    this.embeddingModel = cfg.embeddingModel ?? null;
+  }
 
   isConfigured(): boolean {
-    return Boolean(env.AI_API_KEY);
+    return this.cfg.enabled && Boolean(this.cfg.apiKey);
   }
 
   private headers(): Record<string, string> {
-    if (!env.AI_API_KEY) throw ApiError.aiNotConfigured();
+    if (!this.cfg.apiKey) throw ApiError.aiNotConfigured();
     return {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${env.AI_API_KEY}`,
+      Authorization: `Bearer ${this.cfg.apiKey}`,
     };
   }
 
@@ -134,13 +142,13 @@ export class AiClient {
     }
   }
 
-  /** Embed text for semantic search. Only works when AI_EMBEDDING_MODEL is set. */
+  /** Embed text for semantic search. Only works when an embedding model is set. */
   async embed(text: string): Promise<number[]> {
-    if (!env.AI_EMBEDDING_MODEL) throw ApiError.aiNotConfigured('Embedding model not configured (AI_EMBEDDING_MODEL)');
+    if (!this.cfg.embeddingModel) throw ApiError.aiNotConfigured('Embedding model not configured (AI_EMBEDDING_MODEL)');
     const res = await fetch(`${this.baseUrl}/embeddings`, {
       method: 'POST',
       headers: this.headers(),
-      body: JSON.stringify({ model: env.AI_EMBEDDING_MODEL, input: text.slice(0, 8000) }),
+      body: JSON.stringify({ model: this.cfg.embeddingModel, input: text.slice(0, 8000) }),
       signal: AbortSignal.timeout(env.AI_TIMEOUT_MS),
     });
     if (!res.ok) throw ApiError.aiError(await this.readError(res), res.status);
@@ -230,4 +238,15 @@ export class AiClient {
   }
 }
 
-export const aiClient = new AiClient();
+/**
+ * Env-only fallback client (no user scope). Favour `getAiClient(userId)` which
+ * resolves per-user settings from the database; this singleton is retained for
+ * backward compatibility and as a non-user-scoped default.
+ */
+export const aiClient = new AiClient({
+  baseUrl: env.AI_BASE_URL,
+  model: env.AI_MODEL,
+  embeddingModel: env.AI_EMBEDDING_MODEL ?? null,
+  apiKey: env.AI_API_KEY ?? '',
+  enabled: Boolean(env.AI_API_KEY),
+});

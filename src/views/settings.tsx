@@ -15,6 +15,7 @@ import { useSession } from '@/stores/session';
 import { toast } from 'sonner';
 import type { Profile } from '@/types';
 import { PreferencesCard } from '@/components/settings/preferences-card';
+import { AiProviderCard } from '@/components/settings/ai-provider-card';
 
 const TONES = [
   { value: 'professional', label: 'Professional' },
@@ -248,24 +249,8 @@ export function SettingsPage() {
 
       <PreferencesCard />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-accent" strokeWidth={1.75} />
-            AI provider
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 text-[13px] text-text-muted">
-          <p className="leading-relaxed">
-            LinkPilot uses any OpenAI-compatible endpoint. By default it points at <span className="font-mono text-[12px] text-text-secondary">OpenCode Zen</span> —
-            set <span className="font-mono text-[12px] text-text-secondary">AI_API_KEY</span> in the backend environment to enable drafting, job analysis and
-            interview prep. No key is ever stored in the browser.
-          </p>
-          <p className="font-mono text-[11.5px] text-text-muted/70">
-            AI_BASE_URL · AI_MODEL · AI_API_KEY — see backend <span className="text-text-secondary">.env.example</span>
-          </p>
-        </CardContent>
-      </Card>
+      <AiProviderCard />
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

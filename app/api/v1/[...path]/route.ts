@@ -1,5 +1,5 @@
 import { handle, requireUser, ok, created, noContent, rawJson, sseResponse, type AuthUser } from '@/server/http';
-import { aiClient } from '@/modules/ai/client';
+import { getAiClient, getAiSettingsView, writeAiSettings } from '@/modules/ai/config';
 import type { AiService } from '@/modules/ai/service';
 import { AiService as AiServiceImpl } from '@/modules/ai/service';
 
@@ -89,6 +89,7 @@ import {
   interviewPrepSchema,
   rewriteSchema,
   summarizeSchema,
+  updateAiSettingsSchema,
 } from '@/modules/ai/schema';
 
 // ---- service singletons (mirrors the original Express routers) -------------
@@ -343,8 +344,9 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
       }
       if (m === 'POST' && id === 'semantic') {
         const body = semanticSearchSchema.parse(await parseBody(req));
+        const client = await getAiClient(user.id);
         try {
-          const embedding = await aiClient.embed(body.q);
+          const embedding = await client.embed(body.q);
           return ok({ items: await jobService.semanticSearch(user.id, embedding, body.limit ?? 10), mode: 'semantic' });
         } catch {
           // No embedding model / vector op unavailable → text search fallback.
@@ -512,13 +514,25 @@ async function handleMessages(req: Request, m: string, rest: string[], user: Aut
 // ---- AI endpoints (draft-reply / rewrite stream via SSE) -------------------
 
 async function handleAi(req: Request, m: string, action: string | undefined, user: AuthUser): Promise<Response> {
+  // Per-user AI provider settings.
+  if (action === 'settings') {
+    if (m === 'GET') return ok(await getAiSettingsView(user.id));
+    if (m === 'PUT') {
+      const patch = updateAiSettingsSchema.parse(await parseBody(req));
+      await writeAiSettings(user.id, patch);
+      return ok(await getAiSettingsView(user.id));
+    }
+    throw new Error('Not found: ai/settings');
+  }
+
   if (m !== 'POST' || !action) throw new Error('Not found: ai');
   const body = await parseBody(req);
+  const client = await getAiClient(user.id);
 
   if (action === 'draft-reply') {
     draftReplySchema.parse(body);
-    if (!aiClient.isConfigured()) {
-      return Response.json({ success: false, error: { code: 'AI_NOT_CONFIGURED', message: 'AI is not configured. Set AI_API_KEY (and AI_BASE_URL) in the environment.' } }, { status: 503 });
+    if (!client.isConfigured()) {
+      return Response.json({ success: false, error: { code: 'AI_NOT_CONFIGURED', message: 'AI is not configured. Add an API key on the Settings page or set AI_API_KEY in the environment.' } }, { status: 503 });
     }
     return sseResponse(async (write, signal) => {
       const result = await aiService.draftReply(user.id, { conversationId: body.conversationId as string, extraContext: body.extraContext as string | undefined, tone: body.tone as string | undefined, signal }, (d) => write({ type: 'delta', text: d }));
@@ -528,8 +542,8 @@ async function handleAi(req: Request, m: string, action: string | undefined, use
 
   if (action === 'rewrite') {
     rewriteSchema.parse(body);
-    if (!aiClient.isConfigured()) {
-      return Response.json({ success: false, error: { code: 'AI_NOT_CONFIGURED', message: 'AI is not configured. Set AI_API_KEY in the environment.' } }, { status: 503 });
+    if (!client.isConfigured()) {
+      return Response.json({ success: false, error: { code: 'AI_NOT_CONFIGURED', message: 'AI is not configured. Add an API key on the Settings page or set AI_API_KEY in the environment.' } }, { status: 503 });
     }
     return sseResponse(async (write, signal) => {
       const result = await aiService.rewrite(user.id, { text: body.text as string, tone: body.tone as string | undefined, instruction: body.instruction as string | undefined, signal }, (d) => write({ type: 'delta', text: d }));

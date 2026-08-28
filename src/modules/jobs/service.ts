@@ -1,7 +1,6 @@
 import { ApiError } from '../../utils/ApiError';
 import { auditService } from '../audit/service';
-import { aiClient } from '../ai/client';
-import { env } from '../../config/env';
+import { getAiClient } from '../ai/config';
 import { logger } from '../../utils/logger';
 import { prisma } from '../../database/prisma';
 import { buildImportJobMessages, importJobSchema, type ImportJob } from '../../prompts/importJob';
@@ -13,8 +12,9 @@ export class JobService {
   constructor(private readonly repo: JobRepository) {}
 
   /** Best-effort: generate + persist a pgvector embedding for semantic search. */
-  private async embedJob(job: JobDTO): Promise<void> {
-    if (!env.AI_EMBEDDING_MODEL) return;
+  private async embedJob(userId: string, job: JobDTO): Promise<void> {
+    const client = await getAiClient(userId);
+    if (!client.embeddingModel) return;
     try {
       const text = [
         job.title,
@@ -27,7 +27,7 @@ export class JobService {
       ]
         .filter(Boolean)
         .join('\n');
-      const vector = await aiClient.embed(text);
+      const vector = await client.embed(text);
       await this.repo.updateEmbedding(job.id, vector);
     } catch (err) {
       logger.warn('Embedding generation failed', { jobId: job.id, error: (err as Error).message });
@@ -46,7 +46,7 @@ export class JobService {
 
   async create(userId: string, data: Parameters<JobRepository['create']>[1]): Promise<JobDTO> {
     const job = await this.repo.create(userId, data);
-    void this.embedJob(job);
+    void this.embedJob(userId, job);
     await auditService.log(userId, 'job.create', 'job', job.id, { title: job.title });
     return job;
   }
@@ -54,7 +54,7 @@ export class JobService {
   async update(userId: string, id: string, data: Parameters<JobRepository['update']>[2]): Promise<JobDTO> {
     await this.get(userId, id);
     const updated = await this.repo.update(userId, id, data);
-    if (updated) void this.embedJob(updated);
+    if (updated) void this.embedJob(userId, updated);
     await auditService.log(userId, 'job.update', 'job', id);
     return updated!;
   }
@@ -68,7 +68,8 @@ export class JobService {
 
   /** AI import: paste a job posting URL/text → structured job (reuses or creates the company). */
   async importFromText(userId: string, text: string): Promise<JobDTO> {
-    if (!aiClient.isConfigured()) throw ApiError.aiNotConfigured();
+    const client = await getAiClient(userId);
+    if (!client.isConfigured()) throw ApiError.aiNotConfigured();
 
     // URLs are fetched server-side (plain HTTP, headless browser as fallback)
     // so the model sees the real posting, not just the link.
@@ -79,7 +80,7 @@ export class JobService {
       source = await fetchJobContent(url);
     }
 
-    const extracted = await aiClient.chatJSON<ImportJob>({
+    const extracted = await client.chatJSON<ImportJob>({
       messages: buildImportJobMessages({ text: source, url }),
       schema: importJobSchema,
     });
@@ -110,7 +111,7 @@ export class JobService {
       salaryMax: extracted.salaryMax ?? null,
       status: 'WATCHLIST',
     });
-    void this.embedJob(job);
+    void this.embedJob(userId, job);
     await auditService.log(userId, 'job.import', 'job', job.id, { title: job.title, company: extracted.companyName });
     return job;
   }

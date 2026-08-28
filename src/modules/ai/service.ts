@@ -1,6 +1,6 @@
 import { ApiError } from '../../utils/ApiError';
 import { auditService } from '../audit/service';
-import { aiClient } from './client';
+import { getAiClient } from './config';
 import { buildDraftMessages, buildRewriteMessages } from '../../prompts/draftReply';
 import { buildAnalyzeJobMessages, jobAnalysisSchema, type JobAnalysis } from '../../prompts/analyzeJob';
 import { buildInterviewPrepMessages, interviewPrepSchema, type InterviewPrep } from '../../prompts/interviewPrep';
@@ -65,7 +65,8 @@ export class AiService {
       this.deps.getProfile(userId),
     ]);
     if (!conversation) throw ApiError.notFound('Conversation not found');
-    if (!aiClient.isConfigured()) throw ApiError.aiNotConfigured();
+    const client = await getAiClient(userId);
+    if (!client.isConfigured()) throw ApiError.aiNotConfigured();
 
     const history = await this.deps.getLastMessages(userId, conversation.id, 12);
     const messages = buildDraftMessages({
@@ -81,9 +82,9 @@ export class AiService {
       tone: input.tone,
     });
 
-    const text = await aiClient.streamChat({ messages, signal: input.signal, onDelta });
-    await auditService.log(userId, 'ai.draft', 'conversation', conversation.id, { model: aiClient.model });
-    return { text, model: aiClient.model, provider: aiClient.baseUrl };
+    const text = await client.streamChat({ messages, signal: input.signal, onDelta });
+    await auditService.log(userId, 'ai.draft', 'conversation', conversation.id, { model: client.model });
+    return { text, model: client.model, provider: client.baseUrl };
   }
 
   /** Rewrite a draft the user already wrote (tone / clarity / length). */
@@ -92,21 +93,23 @@ export class AiService {
     input: { text: string; tone?: string; instruction?: string; signal?: AbortSignal },
     onDelta?: (delta: string) => void,
   ): Promise<AiDraftResult> {
-    if (!aiClient.isConfigured()) throw ApiError.aiNotConfigured();
+    const client = await getAiClient(userId);
+    if (!client.isConfigured()) throw ApiError.aiNotConfigured();
     const profile = await this.deps.getProfile(userId);
     const messages = buildRewriteMessages({ profile, ...input });
-    const text = await aiClient.streamChat({ messages, signal: input.signal, onDelta });
-    await auditService.log(userId, 'ai.draft', 'conversation', undefined, { action: 'rewrite', model: aiClient.model });
-    return { text, model: aiClient.model, provider: aiClient.baseUrl };
+    const text = await client.streamChat({ messages, signal: input.signal, onDelta });
+    await auditService.log(userId, 'ai.draft', 'conversation', undefined, { action: 'rewrite', model: client.model });
+    return { text, model: client.model, provider: client.baseUrl };
   }
 
   /** Analyze a job posting: fit score, strengths, gaps, questions. Persists the result. */
   async analyzeJob(userId: string, jobId: string): Promise<JobAnalysis & { jobId: string }> {
     const job = await this.deps.getJob(userId, jobId);
     if (!job) throw ApiError.notFound('Job not found');
-    if (!aiClient.isConfigured()) throw ApiError.aiNotConfigured();
+    const client = await getAiClient(userId);
+    if (!client.isConfigured()) throw ApiError.aiNotConfigured();
 
-    const analysis = await aiClient.chatJSON({
+    const analysis = await client.chatJSON({
       messages: buildAnalyzeJobMessages({
         title: job.title,
         companyName: job.company?.name ?? null,
@@ -127,9 +130,10 @@ export class AiService {
   async prepareInterview(userId: string, interviewId: string): Promise<InterviewPrep & { interviewId: string }> {
     const interview = await this.deps.getInterview(userId, interviewId);
     if (!interview) throw ApiError.notFound('Interview not found');
-    if (!aiClient.isConfigured()) throw ApiError.aiNotConfigured();
+    const client = await getAiClient(userId);
+    if (!client.isConfigured()) throw ApiError.aiNotConfigured();
 
-    const prep = await aiClient.chatJSON({
+    const prep = await client.chatJSON({
       messages: buildInterviewPrepMessages({
         title: interview.title,
         mode: interview.mode,
@@ -151,12 +155,13 @@ export class AiService {
   async summarizeConversation(userId: string, conversationId: string): Promise<ConversationSummary> {
     const conversation = await this.deps.getConversation(userId, conversationId);
     if (!conversation) throw ApiError.notFound('Conversation not found');
-    if (!aiClient.isConfigured()) throw ApiError.aiNotConfigured();
+    const client = await getAiClient(userId);
+    if (!client.isConfigured()) throw ApiError.aiNotConfigured();
 
     const history = await this.deps.getLastMessages(userId, conversation.id, 30);
     if (history.length === 0) throw ApiError.badRequest('Conversation has no messages to summarize');
 
-    const summary = await aiClient.chatJSON({
+    const summary = await client.chatJSON({
       messages: buildSummaryMessages({ contactName: conversation.contactName, history }),
       schema: conversationSummarySchema,
     });
