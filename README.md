@@ -1,127 +1,237 @@
 # LinkPilot
 
-A self-hosted, AI-powered **personal LinkedIn assistant** — one user, their job search, no CRM cruft.
+**Your private AI career copilot.** Track jobs, manage recruiter conversations, prep for interviews, and let AI draft your replies — all from one place.
 
-Track conversations, jobs, recruiters, companies, applications, interviews, notes and reminders in one place. The AI (any OpenAI-compatible endpoint — OpenCode Zen free models work out of the box) drafts replies in your voice, analyzes job fit, prepares you for interviews, and summarizes conversations.
-
-```
-frontend  (React 19 · Vite · Tailwind v4 · TanStack Query · Zustand)
-backend   (Express 5 · TypeScript · Prisma + Neon (PostgreSQL/pgvector) · Better Auth · Socket.IO)
-docker    (Dockerfiles + nginx for production; dev runs natively)
-```
+> Migrated from a separate Express + React (Vite) stack to a unified **Next.js 16** app with App Router, server components, and co-located API routes.
 
 ---
 
-## Quick start (local dev)
+## Features
 
-**1. Create a Neon database.** LinkPilot uses [Neon](https://neon.tech) (serverless Postgres with pgvector) — no local database or Redis required. In the Neon console, create a project and copy the **pooled** connection string (host ends in `-pooler`). It looks like:
+| Area | What it does |
+|---|---|
+| **Dashboard** | At-a-glance pipeline: upcoming interviews, active conversations, application stats |
+| **Conversations** | Threaded recruiter/candidate messages with AI-drafted replies and rewrite assistance |
+| **Jobs** | Track openings with status pipeline (Watchlist → Applied → Interviewing → Offer). AI analyzes each job: fit score, strengths, gaps, likely questions |
+| **Companies** | Company profiles linked to jobs, recruiters, and conversations |
+| **Recruiters** | Recruiter CRM with status tracking (New → Contacted → Responded → …) and last-contact dates |
+| **Interviews** | Schedule and manage interviews. AI generates prep material: topics, likely questions, tips |
+| **Applications** | Application status tracking with cover letters and notes |
+| **Notes** | Pinnable, tagged notes for interview talking points, research, etc. |
+| **Reminders** | Due-date reminders with notification support |
+| **Activity** | Audit log of user and AI actions |
+| **Settings** | Profile, AI tone preferences, career goals |
+| **Auth** | Email/password sign-up & sign-in via Better Auth (30-day sessions) |
 
-```
-postgresql://USER:PASSWORD@...pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require
-```
+### AI capabilities
 
-**2. Configure the backend:**
+Powered by any **OpenAI-compatible** API (OpenAI, OpenCode Zen, local models, etc.):
+
+- **Draft reply** — generates a context-aware response in a conversation thread
+- **Rewrite** — rewrites a message for tone, clarity, or length
+- **Job analysis** — produces a 0–100 fit score plus structured strengths / gaps / questions
+- **Interview prep** — generates topics, likely questions, and tips based on the job and interviewer
+- **Conversation summary** — condenses a long thread into key points
+
+AI features are optional — the app works fully without an AI key configured.
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| UI | React 19, Radix UI, Tailwind CSS 4, Framer Motion, Lucide icons |
+| State | TanStack React Query, Zustand |
+| Forms | React Hook Form + Zod validation |
+| Auth | Better Auth (Prisma adapter, email/password) |
+| Database | PostgreSQL + pgvector (via Prisma) |
+| AI | OpenAI-compatible REST API (streaming SSE, JSON mode, embeddings) |
+| Tooling | TypeScript 5, ESLint 9, tsx |
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- **Node.js** ≥ 20
+- **PostgreSQL** database (local or hosted — e.g. Neon)
+- An **OpenAI-compatible** API key (optional — for AI features)
+
+### 1. Clone and install
 
 ```bash
-cp backend/.env.example backend/.env   # or create backend/.env
-# set DATABASE_URL to your Neon connection string
-# fill in AI_API_KEY to unlock AI features (OpenCode Zen: https://opencode.ai/zen)
-```
-
-Defaults point at a Neon database and an OpenCode Zen endpoint (`AI_BASE_URL=https://opencode.ai/zen/v1`, `AI_MODEL=deepseek-v4-flash-free`).
-
-**3. Install, migrate, seed, run:**
-
-```bash
+git clone https://github.com/TheNeovimmer/LinkPilot.git
+cd LinkPilot
 npm install
-npm run db:migrate    # creates the schema (pgvector included)
-npm run db:seed       # optional demo dataset
-npm run dev           # backend :4000 + frontend :5173
 ```
 
-Importing job **links** uses a headless browser as a fallback for JS-rendered pages. If your OS doesn't already have Chromium/Chrome and you want that fallback, install it once: `npx playwright install chromium`.
+### 2. Environment variables
 
-Open **http://localhost:5173** — sign in with the seeded account
-`demo@linkpilot.app` / `linkpilot-demo-1234`, or create your own.
+Create a `.env.local` at the project root:
 
-API docs (Swagger): http://localhost:4000/docs
+```env
+# Database (PostgreSQL)
+DATABASE_URL="postgresql://user:password@localhost:5432/linkpilot?schema=public"
 
----
+# Better Auth
+BETTER_AUTH_SECRET="a-long-random-string"
+BETTER_AUTH_URL="http://localhost:3000"
 
-## AI setup
+# AI (optional)
+AI_API_KEY="sk-..."
+AI_BASE_URL="https://api.openai.com/v1"
+AI_MODEL="gpt-4o"
+AI_TIMEOUT_MS=60000
+# AI_EMBEDDING_MODEL="text-embedding-3-small"   # enables semantic search
+```
 
-LinkPilot speaks any OpenAI-compatible chat API. Set in `backend/.env`:
+### 3. Database setup
 
-| Variable            | Default                                | Notes                                  |
-| ------------------- | -------------------------------------- | -------------------------------------- |
-| `AI_BASE_URL`       | `https://opencode.ai/zen/v1`           | OpenAI-compatible base URL             |
-| `AI_API_KEY`        | *(unset)*                              | Unset → AI features disabled gracefully|
-| `AI_MODEL`          | `deepseek-v4-flash-free`               | Free OpenCode Zen model                |
-| `AI_EMBEDDING_MODEL`| *(unset)*                              | Set e.g. `text-embedding-3-small` for vector semantic job search; text fallback otherwise |
+```bash
+npx prisma generate
+npx prisma migrate dev
+```
 
-Without a key the app runs fully — AI buttons surface a clear "not configured" state.
+### 4. Seed demo data (optional)
+
+```bash
+npm run db:seed
+```
+
+This creates a demo account with realistic sample data:
+
+| | |
+|---|---|
+| Email | `demo@linkpilot.app` |
+| Password | `linkpilot-demo-1234` |
+
+### 5. Run
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
 ## Scripts
 
-| Command                  | What it does                                  |
-| ------------------------ | --------------------------------------------- |
-| `npm run dev`            | Backend + frontend dev servers                |
-| `npm run dev:backend`    | API only (tsx watch, :4000)                   |
-| `npm run dev:frontend`   | Web only (Vite, :5173, proxies /api → :4000)  |
-| `npm run build`          | Type-check + build both workspaces            |
-| `npm run typecheck`      | `tsc --noEmit` both workspaces                |
-| `npm run lint`           | ESLint (backend) + tsc (frontend)             |
-| `npm test`               | Backend unit tests (vitest)                   |
-| `npm run db:migrate`     | Prisma migrate dev                            |
-| `npm run db:seed`        | Idempotent demo dataset                       |
-| `npm run db:studio`      | Prisma Studio                                 |
-
-Production: `docker compose up --build` (backend + nginx serving the built frontend; edit `AI_API_KEY` and `DATABASE_URL` under `backend.environment` first).
+| Command | Description |
+|---|---|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript type checking |
+| `npm run db:generate` | Regenerate Prisma client |
+| `npm run db:migrate` | Run Prisma migrations (dev) |
+| `npm run db:deploy` | Deploy migrations (production) |
+| `npm run db:seed` | Seed demo data |
+| `npm run db:studio` | Open Prisma Studio |
 
 ---
 
-## Architecture
-
-Modular monorepo — each module is a self-contained `controller → service → repository` stack with zod validation and typed DTOs:
+## Project structure
 
 ```
-src/modules/
-  auth          Better Auth (email/password) at /api/auth, session middleware
-  users         profile + avatar upload (multer) — the AI context
-  conversations  contact tracking + message threads
-  messages      thread messages (ME / THEM / AI roles)
-  recruiters    people pipeline
-  companies     orgs
-  jobs          roles + pgvector semantic search + AI fit analysis
-  applications  application pipeline
-  interviews    calendar + AI prep
-  notes         free-form notes with tags
-  reminders     due notifications (cron worker every minute)
-  notifications Socket.IO realtime push + in-app inbox
-  ai            streaming SSE endpoints: draft-reply, rewrite, summarize, analyze-job, interview-prep
-  audit         immutable audit log
-  dashboard     stats (computed on demand)
+├── app/                          # Next.js App Router
+│   ├── (app)/                    # Authenticated pages (route group)
+│   │   ├── dashboard/
+│   │   ├── conversations/
+│   │   ├── jobs/
+│   │   ├── companies/
+│   │   ├── recruiters/
+│   │   ├── interviews/
+│   │   ├── applications/
+│   │   ├── notes/
+│   │   ├── reminders/
+│   │   ├── activity/
+│   │   └── settings/
+│   ├── api/                      # API routes
+│   │   ├── auth/[...all]/        # Better Auth handler
+│   │   ├── health/               # Health check
+│   │   └── v1/[...path]/         # REST API catch-all
+│   ├── login/
+│   ├── layout.tsx                # Root layout
+│   └── page.tsx                  # Landing / redirect
+├── src/
+│   ├── components/               # React components
+│   │   ├── ui/                   # Primitives (Button, Card, Dialog, …)
+│   │   ├── layout/               # Sidebar, Topbar, CommandPalette
+│   │   ├── ai/                   # AI composer
+│   │   ├── jobs/                 # Job forms, import, analyze
+│   │   ├── conversations/        # Thread, list, form
+│   │   ├── interviews/           # Interview form, prep
+│   │   └── …
+│   ├── modules/                  # Domain modules (service + repository + types)
+│   │   ├── ai/
+│   │   ├── auth/
+│   │   ├── jobs/
+│   │   ├── conversations/
+│   │   ├── interviews/
+│   │   ├── recruiters/
+│   │   ├── companies/
+│   │   ├── applications/
+│   │   ├── notes/
+│   │   ├── reminders/
+│   │   ├── notifications/
+│   │   ├── dashboard/
+│   │   ├── users/
+│   │   └── audit/
+│   ├── prompts/                  # AI prompt builders
+│   ├── lib/                      # Shared utilities (API client, formatters, SSE)
+│   ├── stores/                   # Zustand stores (session, UI)
+│   ├── config/                   # Env validation
+│   ├── database/                 # Prisma client singleton
+│   ├── server/                   # Server utilities (HTTP, realtime, workers)
+│   ├── types/                    # Shared types
+│   ├── utils/                    # Helpers (errors, logging, pagination, …)
+│   └── views/                    # Page-level view components
+├── prisma/
+│   ├── schema.prisma             # Database schema (PostgreSQL + pgvector)
+│   ├── seed.ts                   # Idempotent demo seed
+│   └── migrations/
+├── public/                       # Static assets
+├── logs/                         # Server logs (gitignored)
+└── package.json
 ```
 
-- **Response envelope:** `{ success, data, meta }` everywhere; errors `{ success, error: { code, message } }`.
-- **Cross-entity logic:** moving an application to `INTERVIEWING`/`OFFER`/etc. syncs the linked job's status and fires a milestone notification; scheduling an interview moves the linked job + application to `INTERVIEWING`, notifies you, and re-arms the 24h reminder when rescheduled.
-- **Workers:** two cron jobs, once a minute — due reminders and interviews within the next 24h become realtime notifications (once each).
-- **Semantic search:** `Job.embedding` is a pgvector `vector(1536)`; embeddings are generated automatically on job create/update when `AI_EMBEDDING_MODEL` is set, and search falls back to a multi-word text match otherwise.
-- **Account lifecycle:** change password (`/api/auth/change-password`, signs out other sessions) and delete account (cascades through every owned row) from Settings.
-- **Activity log:** every mutation is recorded (`/activity` in the UI) with action/entity filters and pagination.
-- **Uploads:** avatars are sniffed by magic bytes (raster-only — no SVG/XSS), size-capped, and old files are removed on replace.
-- **Job import from a link:** pasting a URL into Import fetches the posting server-side (plain HTTP first, headless browser fallback for JS-rendered pages) and the AI extracts title/company/salary/description from the real content. Sites behind hard bot walls (aggressive Cloudflare/Turnstile) return a clear error — paste the description text instead.
-- **Auth:** Better Auth session cookie; the web client calls `/api/auth/*` directly and `/api/v1/*` via axios with `withCredentials`.
-- **AI streaming:** SSE from `/api/v1/ai/*` — `{ type: "delta" | "done" | "error" }` events; client aborts on disconnect.
-- **Workers:** `node-cron` turns due reminders into notifications + realtime push every minute.
-- **CI:** GitHub Actions — install → prisma generate → typecheck → lint → test → build (`.github/workflows/ci.yml`).
+---
 
-## Tests
+## Architecture notes
 
-Backend unit tests cover the fiddly bits: pagination helpers, JSON extraction from model output, and prompt construction (`backend/tests/`). Run with `npm test`.
+- **Modular domain design** — each domain (jobs, conversations, interviews, etc.) owns its repository, service, types, and Zod schemas under `src/modules/`.
+- **API routes** — Next.js Route Handlers in `app/api/v1/` proxy to the modular services. Auth is handled by Better Auth mounted at `/api/auth`.
+- **AI as a sidecar** — the AI client is OpenAI-compatible and optional. All AI features degrade gracefully when no key is configured.
+- **pgvector** — the `Job` model supports vector embeddings for future semantic search.
+- **No Redis** — after migration, all server state lives in PostgreSQL (sessions, rate limiting via Better Auth).
+
+---
+
+## Deployment
+
+### Vercel (recommended)
+
+1. Push to GitHub
+2. Import the repo on [vercel.com](https://vercel.com)
+3. Set environment variables in the Vercel dashboard
+4. Add a PostgreSQL database (e.g. Neon) and set `DATABASE_URL`
+5. Deploy — Vercel runs `prisma generate` automatically via `postinstall`
+
+### Self-hosted
+
+```bash
+npm run build
+npm run db:deploy    # run migrations against production DB
+npm run start
+```
+
+---
 
 ## License
 
-MIT — private by default: every record is scoped to the single owner user. No third-party analytics, no tracking.
+Private — not open for redistribution.
