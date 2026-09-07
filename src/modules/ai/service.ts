@@ -8,6 +8,7 @@ import { buildSummaryMessages, conversationSummarySchema, type ConversationSumma
 import type { ProfileContext } from '../../prompts/system';
 import type { DraftHistoryItem } from '../../prompts/draftReply';
 import type { AiDraftResult } from './types';
+import { normalizeScope, type ScopeInput } from '../../server/scope';
 
 /**
  * Minimal structural contracts for the repositories the AI service needs.
@@ -42,12 +43,12 @@ export interface AiInterview {
 }
 
 export interface AiDeps {
-  getConversation: (userId: string, id: string) => Promise<AiConversation | null>;
-  getLastMessages: (userId: string, conversationId: string, n: number) => Promise<DraftHistoryItem[]>;
-  getJob: (userId: string, id: string) => Promise<AiJob | null>;
-  updateJobAnalysis: (userId: string, id: string, fitScore: number, analysis: JobAnalysis) => Promise<void>;
-  getInterview: (userId: string, id: string) => Promise<AiInterview | null>;
-  updateInterviewPrep: (userId: string, id: string, prep: InterviewPrep) => Promise<void>;
+  getConversation: (scope: ScopeInput, id: string) => Promise<AiConversation | null>;
+  getLastMessages: (scope: ScopeInput, conversationId: string, n: number) => Promise<DraftHistoryItem[]>;
+  getJob: (scope: ScopeInput, id: string) => Promise<AiJob | null>;
+  updateJobAnalysis: (scope: ScopeInput, id: string, fitScore: number, analysis: JobAnalysis) => Promise<void>;
+  getInterview: (scope: ScopeInput, id: string) => Promise<AiInterview | null>;
+  updateInterviewPrep: (scope: ScopeInput, id: string, prep: InterviewPrep) => Promise<void>;
   getProfile: (userId: string) => Promise<ProfileContext | null>;
 }
 
@@ -56,19 +57,20 @@ export class AiService {
 
   /** Stream a drafted reply for a conversation. onDelta receives text chunks. */
   async draftReply(
-    userId: string,
+    scopeInput: ScopeInput,
     input: { conversationId: string; extraContext?: string; tone?: string; signal?: AbortSignal },
     onDelta?: (delta: string) => void,
   ): Promise<AiDraftResult> {
+    const { userId, orgId } = normalizeScope(scopeInput);
     const [conversation, profile] = await Promise.all([
-      this.deps.getConversation(userId, input.conversationId),
+      this.deps.getConversation(scopeInput, input.conversationId),
       this.deps.getProfile(userId),
     ]);
     if (!conversation) throw ApiError.notFound('Conversation not found');
     const client = await getAiClient(userId);
     if (!client.isConfigured()) throw ApiError.aiNotConfigured();
 
-    const history = await this.deps.getLastMessages(userId, conversation.id, 12);
+    const history = await this.deps.getLastMessages(scopeInput, conversation.id, 12);
     const messages = buildDraftMessages({
       profile,
       contact: {
@@ -83,28 +85,30 @@ export class AiService {
     });
 
     const text = await client.streamChat({ messages, signal: input.signal, onDelta });
-    await auditService.log(userId, 'ai.draft', 'conversation', conversation.id, { model: client.model });
+    await auditService.log(userId, 'ai.draft', 'conversation', conversation.id, { model: client.model }, undefined, orgId || undefined);
     return { text, model: client.model, provider: client.baseUrl };
   }
 
   /** Rewrite a draft the user already wrote (tone / clarity / length). */
   async rewrite(
-    userId: string,
+    scopeInput: ScopeInput,
     input: { text: string; tone?: string; instruction?: string; signal?: AbortSignal },
     onDelta?: (delta: string) => void,
   ): Promise<AiDraftResult> {
+    const { userId, orgId } = normalizeScope(scopeInput);
     const client = await getAiClient(userId);
     if (!client.isConfigured()) throw ApiError.aiNotConfigured();
     const profile = await this.deps.getProfile(userId);
     const messages = buildRewriteMessages({ profile, ...input });
     const text = await client.streamChat({ messages, signal: input.signal, onDelta });
-    await auditService.log(userId, 'ai.draft', 'conversation', undefined, { action: 'rewrite', model: client.model });
+    await auditService.log(userId, 'ai.draft', 'conversation', undefined, { action: 'rewrite', model: client.model }, undefined, orgId || undefined);
     return { text, model: client.model, provider: client.baseUrl };
   }
 
   /** Analyze a job posting: fit score, strengths, gaps, questions. Persists the result. */
-  async analyzeJob(userId: string, jobId: string): Promise<JobAnalysis & { jobId: string }> {
-    const job = await this.deps.getJob(userId, jobId);
+  async analyzeJob(scopeInput: ScopeInput, jobId: string): Promise<JobAnalysis & { jobId: string }> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    const job = await this.deps.getJob(scopeInput, jobId);
     if (!job) throw ApiError.notFound('Job not found');
     const client = await getAiClient(userId);
     if (!client.isConfigured()) throw ApiError.aiNotConfigured();
@@ -121,14 +125,15 @@ export class AiService {
       schema: jobAnalysisSchema,
     });
 
-    await this.deps.updateJobAnalysis(userId, job.id, analysis.fitScore, analysis);
-    await auditService.log(userId, 'job.analyze', 'job', job.id, { fitScore: analysis.fitScore });
+    await this.deps.updateJobAnalysis(scopeInput, job.id, analysis.fitScore, analysis);
+    await auditService.log(userId, 'job.analyze', 'job', job.id, { fitScore: analysis.fitScore }, undefined, orgId || undefined);
     return { ...analysis, jobId: job.id };
   }
 
   /** Prepare for an interview round. Persists the prep. */
-  async prepareInterview(userId: string, interviewId: string): Promise<InterviewPrep & { interviewId: string }> {
-    const interview = await this.deps.getInterview(userId, interviewId);
+  async prepareInterview(scopeInput: ScopeInput, interviewId: string): Promise<InterviewPrep & { interviewId: string }> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    const interview = await this.deps.getInterview(scopeInput, interviewId);
     if (!interview) throw ApiError.notFound('Interview not found');
     const client = await getAiClient(userId);
     if (!client.isConfigured()) throw ApiError.aiNotConfigured();
@@ -146,19 +151,20 @@ export class AiService {
       schema: interviewPrepSchema,
     });
 
-    await this.deps.updateInterviewPrep(userId, interview.id, prep);
-    await auditService.log(userId, 'interview.prep', 'interview', interview.id);
+    await this.deps.updateInterviewPrep(scopeInput, interview.id, prep);
+    await auditService.log(userId, 'interview.prep', 'interview', interview.id, undefined, undefined, orgId || undefined);
     return { ...prep, interviewId: interview.id };
   }
 
   /** Summarize a conversation. */
-  async summarizeConversation(userId: string, conversationId: string): Promise<ConversationSummary> {
-    const conversation = await this.deps.getConversation(userId, conversationId);
+  async summarizeConversation(scopeInput: ScopeInput, conversationId: string): Promise<ConversationSummary> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    const conversation = await this.deps.getConversation(scopeInput, conversationId);
     if (!conversation) throw ApiError.notFound('Conversation not found');
     const client = await getAiClient(userId);
     if (!client.isConfigured()) throw ApiError.aiNotConfigured();
 
-    const history = await this.deps.getLastMessages(userId, conversation.id, 30);
+    const history = await this.deps.getLastMessages(scopeInput, conversation.id, 30);
     if (history.length === 0) throw ApiError.badRequest('Conversation has no messages to summarize');
 
     const summary = await client.chatJSON({
@@ -166,7 +172,7 @@ export class AiService {
       schema: conversationSummarySchema,
     });
 
-    await auditService.log(userId, 'ai.summarize', 'conversation', conversation.id);
+    await auditService.log(userId, 'ai.summarize', 'conversation', conversation.id, undefined, undefined, orgId || undefined);
     return summary;
   }
 }
