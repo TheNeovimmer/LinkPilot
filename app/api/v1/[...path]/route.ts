@@ -508,59 +508,65 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
       throw new Error('Not found: interviews');
     }
     case 'notes': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'tags') return ok(await noteService.tags(user.id));
+      if (m === 'GET' && id === 'tags') return ok(await noteService.tags(scope));
       if (m === 'GET' && !id) {
-        const r = await noteService.list(user.id, queryOf(req, noteQuerySchema));
+        const r = await noteService.list(scope, queryOf(req, noteQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof noteService.create>[1]>(createNoteSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await noteService.create(scope, asServiceInput<Parameters<typeof noteService.create>[1]>(createNoteSchema.parse(await parseBody(req)))));
       if (id) {
         noteIdSchema.parse({ id });
-        if (m === 'GET') return ok(await noteService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof noteService.update>[2]>(updateNoteSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await noteService.get(scope, id));
+        if (m === 'PATCH') return ok(await noteService.update(scope, id, asServiceInput<Parameters<typeof noteService.update>[2]>(updateNoteSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await noteService.remove(user.id, id);
+          await noteService.remove(scope, id);
           return noContent();
         }
       }
       throw new Error('Not found: notes');
     }
     case 'reminders': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
       if (m === 'GET' && !id) {
-        const r = await reminderService.list(user.id, queryOf(req, reminderQuerySchema));
+        const r = await reminderService.list(scope, queryOf(req, reminderQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof reminderService.create>[1]>(createReminderSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await reminderService.create(scope, asServiceInput<Parameters<typeof reminderService.create>[1]>(createReminderSchema.parse(await parseBody(req)))));
       if (id) {
         reminderIdSchema.parse({ id });
-        if (m === 'GET') return ok(await reminderService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof reminderService.update>[2]>(updateReminderSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await reminderService.get(scope, id));
+        if (m === 'PATCH') return ok(await reminderService.update(scope, id, asServiceInput<Parameters<typeof reminderService.update>[2]>(updateReminderSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await reminderService.remove(user.id, id);
+          await reminderService.remove(scope, id);
           return noContent();
         }
       }
       throw new Error('Not found: reminders');
     }
     case 'notifications': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'unread-count') return ok({ count: await notificationService.unreadCount(user.id) });
-      if (m === 'POST' && id === 'read-all') return ok({ marked: await notificationService.markAllRead(user.id) });
+      if (m === 'GET' && id === 'unread-count') return ok({ count: await notificationService.unreadCount(scope) });
+      if (m === 'POST' && id === 'read-all') return ok({ marked: await notificationService.markAllRead(scope) });
       if (m === 'GET' && !id) {
-        const r = await notificationService.list(user.id, queryOf(req, notificationQuerySchema));
+        const r = await notificationService.list(scope, queryOf(req, notificationQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
       if (id && rest[1] === 'read' && m === 'PATCH') {
         notificationIdSchema.parse({ id });
-        await notificationService.markRead(user.id, id);
+        await notificationService.markRead(scope, id);
         return noContent();
       }
       if (id) {
         notificationIdSchema.parse({ id });
         if (m === 'DELETE') {
-          await notificationService.remove(user.id, id);
+          await notificationService.remove(scope, id);
           return noContent();
         }
       }
