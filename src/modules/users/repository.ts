@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+// (Prisma Bytes columns accept Node Buffers at runtime; the unchecked input cast bridges the Uint8Array generics.)
 import { prisma } from '../../database/prisma';
 import type { ProfileDTO } from './types';
 import type { ProfileContext } from '../../prompts/system';
@@ -51,8 +52,11 @@ export class ProfileRepository {
     return this.findById(userId);
   }
 
-  async updateImage(userId: string, imageUrl: string): Promise<ProfileDTO | null> {
-    await prisma.user.update({ where: { id: userId }, data: { image: imageUrl } });
+  async updateImage(userId: string, imageUrl: string, avatar?: { data: Buffer; mime: string }): Promise<ProfileDTO | null> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { image: imageUrl, ...(avatar ? { avatarData: avatar.data, avatarMime: avatar.mime } : {}) } as Prisma.UserUncheckedUpdateInput,
+    });
     return this.findById(userId);
   }
 

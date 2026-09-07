@@ -11,20 +11,19 @@ export function normalizeScope(input: ScopeInput): DataScope {
   return typeof input === 'string' ? { userId: input, orgId: '' } : input;
 }
 
-/** Resolve workspace scope: SUPER_ADMIN bypasses membership but still prefers header/query org. */
+/** Resolve workspace scope: SUPER_ADMIN bypasses membership but still prefers header/query org.
+ * Shares the dispatch gate's per-request memo, so membership resolves once per request. */
 export async function resolveDataScope(req: Request, user: { id: string }): Promise<DataScope> {
-  const { prisma } = await import('../database/prisma');
-  const me = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
+  const { isSuperAdmin, requireOrg } = await import('./http');
   const header = req.headers.get('x-org-id');
   const query = new URL(req.url).searchParams.get('orgId');
   const hint = header || query;
-  if (me?.platformRole === 'SUPER_ADMIN') {
+  if (await isSuperAdmin(req, user.id)) {
+    // No auto-provisioning on the read path: without an explicit hint the
+    // admin sees personal rows only (a GET must never write).
     if (hint) return { userId: user.id, orgId: hint };
-    const { organizationService } = await import('../modules/organizations/service');
-    const orgs = await organizationService.listForUser(user.id).catch(() => []);
-    return { userId: user.id, orgId: orgs[0]?.id ?? '' };
+    return { userId: user.id, orgId: '' };
   }
-  const { requireOrg } = await import('./http');
   const ctx = await requireOrg(req, user as never, undefined);
   return { userId: user.id, orgId: ctx.orgId };
 }
@@ -45,7 +44,7 @@ export function scopeIdWhere(scope: DataScope, id: string) {
   return { id, AND: [scopeReadWhere(scope)] };
 }
 
-/** Dual-write both columns so old userId-only code keeps working during rollout. */
+/** Dual-write both columns; empty orgId becomes null so legacy personal rows keep the null invariant. */
 export function scopeCreateData(scope: DataScope) {
-  return { userId: scope.userId, orgId: scope.orgId };
+  return { userId: scope.userId, orgId: scope.orgId || null };
 }

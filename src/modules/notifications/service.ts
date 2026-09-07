@@ -2,7 +2,7 @@ import { ApiError } from '../../utils/ApiError';
 import type { Prisma } from '@prisma/client';
 import type { NotificationDTO, NotificationType } from './types';
 import { NotificationRepository } from './repository';
-import type { ScopeInput } from '../../server/scope';
+import { normalizeScope, type ScopeInput } from '../../server/scope';
 
 export type NotificationPublisher = (userId: string, notification: NotificationDTO) => void;
 
@@ -24,6 +24,31 @@ export class NotificationService {
     const notification = await this.repo.create({ ...data, data: data.data as Prisma.InputJsonValue | undefined });
     this.publish(data.userId, notification);
     return notification;
+  }
+
+  /** Pipeline events for the whole workspace: every member is notified (actor included).
+   * Personal scope notifies the owner only, preserving single-user behavior. */
+  async createForMembers(
+    scopeInput: ScopeInput,
+    data: {
+      type: NotificationType;
+      title: string;
+      body?: string;
+      data?: Record<string, unknown>;
+    },
+  ): Promise<NotificationDTO[]> {
+    const scope = normalizeScope(scopeInput);
+    if (!scope.orgId) return [await this.create({ userId: scope.userId, orgId: null, ...data })];
+    const { prisma } = await import('../../database/prisma');
+    const members = await prisma.membership.findMany({ where: { orgId: scope.orgId }, select: { userId: true } });
+    const out: NotificationDTO[] = [];
+    const seen = new Set<string>();
+    for (const m of members) {
+      if (seen.has(m.userId)) continue;
+      seen.add(m.userId);
+      out.push(await this.create({ userId: m.userId, orgId: scope.orgId, ...data }));
+    }
+    return out;
   }
 
   async list(scopeInput: ScopeInput, query: Parameters<NotificationRepository['list']>[1]) {

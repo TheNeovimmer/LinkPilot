@@ -26,8 +26,8 @@ export class UserService {
     return updated;
   }
 
-  async updateAvatar(userId: string, imageUrl: string): Promise<ProfileDTO> {
-    const updated = await this.repo.updateImage(userId, imageUrl);
+  async updateAvatar(userId: string, imageUrl: string, avatar?: { data: Buffer; mime: string }): Promise<ProfileDTO> {
+    const updated = await this.repo.updateImage(userId, imageUrl, avatar);
     if (!updated) throw ApiError.notFound('Profile not found');
     return updated;
   }
