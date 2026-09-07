@@ -13,9 +13,11 @@ import { ConversationList } from '@/components/conversations/conversation-list';
 import { ConversationThread } from '@/components/conversations/conversation-thread';
 import { ConversationForm } from '@/components/conversations/conversation-form';
 import { cn } from '@/lib/utils';
+import { useCanWrite } from '@/stores/org';
 import type { Conversation } from '@/types';
 
 export function ConversationsPage() {
+  const canWrite = useCanWrite();
   const { id } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -33,7 +35,7 @@ export function ConversationsPage() {
       <div className={cn(id ? 'hidden lg:flex' : 'flex', 'w-full flex-col lg:w-[340px] lg:shrink-0 lg:border-r lg:border-border')}>
         <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
           <span className="text-[13px] font-semibold text-text">Conversations</span>
-          <Button size="icon-sm" variant="secondary" onClick={() => setFormOpen(true)} title="New conversation">
+          <Button size="icon-sm" variant="secondary" onClick={() => setFormOpen(true)} title={canWrite ? 'New conversation' : 'Viewers cannot edit'} disabled={!canWrite}>
             <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
           </Button>
         </div>
@@ -63,7 +65,7 @@ export function ConversationsPage() {
               title="Select a conversation"
               description="Pick a conversation from the list, or start a new one to track a recruiter chat."
               action={
-                <Button size="sm" variant="secondary" onClick={() => setFormOpen(true)}>
+                <Button size="sm" variant="secondary" onClick={() => setFormOpen(true)} disabled={!canWrite}>
                   <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
                   New conversation
                 </Button>
