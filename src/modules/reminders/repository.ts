@@ -4,7 +4,7 @@ import { parsePagination, pickOrder, pickSort, prismaTakeSkip, buildMeta } from 
 import type { z } from 'zod';
 import type { reminderQuerySchema } from './schema';
 import type { ReminderDTO } from './types';
-import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, scopeReadWhere, type ScopeInput } from '../../server/scope';
+import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, type ScopeInput } from '../../server/scope';
 
 type ListQuery = z.infer<typeof reminderQuerySchema>;
 
