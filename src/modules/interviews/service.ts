@@ -41,6 +41,7 @@ export class InterviewService {
     await this.syncLinkedStatus(scopeInput, interview);
     await notificationService.create({
       userId,
+      orgId: orgId || null,
       type: 'INTERVIEW',
       title: `Interview scheduled: ${interview.title}`,
       body: interview.companyName ?? undefined,
@@ -67,6 +68,7 @@ export class InterviewService {
     if (result.status === 'COMPLETED' && current.status !== 'COMPLETED') {
       await notificationService.create({
         userId,
+        orgId: orgId || null,
         type: 'SYSTEM',
         title: `Interview completed: ${result.title}`,
         body: 'Log the outcome while it is fresh.',
