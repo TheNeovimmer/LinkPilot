@@ -31,7 +31,7 @@ export class OrganizationService {
       data: { name: `${name} workspace`, slug: slugify(name, userId) },
     });
     await prisma.membership.create({ data: { orgId: org.id, userId, role: 'OWNER' } });
-    await auditService.log(userId, 'org.auto_create', 'organization', org.id, { name: org.name });
+    await auditService.log(userId, 'org.auto_create', 'organization', org.id, { name: org.name }, undefined, org.id);
     return [{ id: org.id, name: org.name, slug: org.slug, role: 'OWNER' as OrgRole, joinedAt: new Date() }];
   }
 
@@ -50,7 +50,7 @@ export class OrganizationService {
     try {
       const org = await prisma.organization.create({ data: { name: input.name, slug: input.slug } });
       await prisma.membership.create({ data: { orgId: org.id, userId, role: 'OWNER' } });
-      await auditService.log(userId, 'org.create', 'organization', org.id, { name: input.name });
+      await auditService.log(userId, 'org.create', 'organization', org.id, { name: input.name }, undefined, org.id);
       return { id: org.id, name: org.name, slug: org.slug, role: 'OWNER' as OrgRole };
     } catch (e: unknown) {
       if (e instanceof Error && e.message.includes('Unique constraint')) throw ApiError.conflict('Slug already taken');
@@ -73,14 +73,14 @@ export class OrganizationService {
   async update(userId: string, orgId: string, input: { name?: string }) {
     await this.requireRole(userId, orgId, 'ADMIN');
     const org = await prisma.organization.update({ where: { id: orgId }, data: { name: input.name } });
-    await auditService.log(userId, 'org.update', 'organization', orgId, input);
+    await auditService.log(userId, 'org.update', 'organization', orgId, input, undefined, orgId);
     return { id: org.id, name: org.name, slug: org.slug };
   }
 
   async remove(userId: string, orgId: string) {
     await this.requireRole(userId, orgId, 'OWNER');
     await prisma.organization.delete({ where: { id: orgId } });
-    await auditService.log(userId, 'org.delete', 'organization', orgId);
+    await auditService.log(userId, 'org.delete', 'organization', orgId, undefined, undefined, orgId);
   }
 
   async listMembers(userId: string, orgId: string) {
@@ -102,7 +102,7 @@ export class OrganizationService {
     const err = checkRoleChange({ actor: actor.role as OrgRole, targetCurrent: target.role as OrgRole, targetNext: next, otherOwners: owners });
     if (err) throw toApiError(err);
     await prisma.membership.update({ where: { orgId_userId: { orgId, userId: targetUserId } }, data: { role: next } });
-    await auditService.log(actorId, 'org.member.role', 'membership', targetUserId, { orgId, role: next });
+    await auditService.log(actorId, 'org.member.role', 'membership', targetUserId, { orgId, role: next }, undefined, orgId);
     return { ok: true };
   }
 
@@ -118,7 +118,7 @@ export class OrganizationService {
     const err = checkRemove({ actor: (await this.membershipOf(actorId, orgId))?.role as OrgRole, isSelf: actorId === targetUserId, targetCurrent: target.role as OrgRole, otherOwners: owners });
     if (err) throw toApiError(err);
     await prisma.membership.delete({ where: { orgId_userId: { orgId, userId: targetUserId } } });
-    await auditService.log(actorId, 'org.member.remove', 'membership', targetUserId, { orgId });
+    await auditService.log(actorId, 'org.member.remove', 'membership', targetUserId, { orgId }, undefined, orgId);
     return { ok: true };
   }
 
@@ -134,7 +134,7 @@ export class OrganizationService {
     const invite = await prisma.orgInvitation.create({
       data: { orgId, email: clean, role: next, status: 'PENDING', invitedBy: actorId, expiresAt: new Date(Date.now() + 7 * 86400000) },
     });
-    await auditService.log(actorId, 'org.invite', 'invitation', invite.id, { orgId, email: clean, role: next });
+    await auditService.log(actorId, 'org.invite', 'invitation', invite.id, { orgId, email: clean, role: next }, undefined, orgId);
     return { id: invite.id, token: invite.token, expiresAt: invite.expiresAt };
   }
 
@@ -146,7 +146,7 @@ export class OrganizationService {
   async revokeInvite(actorId: string, orgId: string, inviteId: string) {
     await this.requireRole(actorId, orgId, 'ADMIN');
     await prisma.orgInvitation.updateMany({ where: { id: inviteId, orgId, status: 'PENDING' }, data: { status: 'REVOKED' } });
-    await auditService.log(actorId, 'org.invite.revoke', 'invitation', inviteId, { orgId });
+    await auditService.log(actorId, 'org.invite.revoke', 'invitation', inviteId, { orgId }, undefined, orgId);
     return { ok: true };
   }
 
@@ -166,7 +166,7 @@ export class OrganizationService {
       update: {},
     });
     await prisma.orgInvitation.update({ where: { id: invite.id }, data: { status: 'ACCEPTED' } });
-    await auditService.log(userId, 'org.invite.accept', 'organization', invite.orgId);
+    await auditService.log(userId, 'org.invite.accept', 'organization', invite.orgId, undefined, undefined, invite.orgId);
     return { orgId: invite.orgId };
   }
 
