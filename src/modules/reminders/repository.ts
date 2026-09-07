@@ -58,6 +58,15 @@ export class ReminderRepository {
     }) as Promise<ReminderDTO[]>;
   }
 
+  /** Global due scan for the cron worker (system-level, no user scope). */
+  async dueNowAll(now: Date): Promise<ReminderDTO[]> {
+    return prisma.reminder.findMany({
+      where: { done: false, remindedAt: null, dueAt: { lte: now } },
+      orderBy: { dueAt: 'asc' },
+      take: 200,
+    }) as Promise<ReminderDTO[]>;
+  }
+
   async markReminded(id: string, now: Date): Promise<void> {
     await prisma.reminder.update({ where: { id }, data: { remindedAt: now } });
   }
