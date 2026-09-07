@@ -36,6 +36,26 @@ export interface OrgContext {
   role: import('../modules/rbac/roles').OrgRole;
 }
 
+/** Per-request memo so the route gate and scope resolution share one membership lookup. */
+const orgContextCache = new WeakMap<Request, Map<string, OrgContext>>();
+const superAdminCache = new WeakMap<Request, Map<string, boolean>>();
+
+/** Cached platform-owner check (one indexed lookup per request per user). */
+export async function isSuperAdmin(req: Request, userId: string): Promise<boolean> {
+  let perReq = superAdminCache.get(req);
+  const hit = perReq?.get(userId);
+  if (hit !== undefined) return hit;
+  const { prisma } = await import('../database/prisma');
+  const row = await prisma.user.findUnique({ where: { id: userId }, select: { platformRole: true } });
+  const value = row?.platformRole === 'SUPER_ADMIN';
+  if (!perReq) {
+    perReq = new Map();
+    superAdminCache.set(req, perReq);
+  }
+  perReq.set(userId, value);
+  return value;
+}
+
 export async function requireOrg(req: Request, user: AuthUser, min?: import('../modules/rbac/roles').OrgRole): Promise<OrgContext> {
   const { organizationService } = await import('../modules/organizations/service');
   const { atLeast } = await import('../modules/rbac/roles');
@@ -47,11 +67,21 @@ export async function requireOrg(req: Request, user: AuthUser, min?: import('../
     orgId = orgs[0]?.id ?? null;
   }
   if (!orgId) throw ApiError.forbidden('No workspace');
-  const m = await organizationService.membershipOf(user.id, orgId);
-  if (!m) throw ApiError.forbidden('Not a member of this workspace');
-  const role = m.role as import('../modules/rbac/roles').OrgRole;
-  if (min && !atLeast(role, min)) throw ApiError.forbidden('Insufficient role');
-  return { orgId, role };
+  const cacheKey = `${user.id}::${orgId}`;
+  let perReq = orgContextCache.get(req);
+  let ctx = perReq?.get(cacheKey);
+  if (!ctx) {
+    const m = await organizationService.membershipOf(user.id, orgId);
+    if (!m) throw ApiError.forbidden('Not a member of this workspace');
+    ctx = { orgId, role: m.role as import('../modules/rbac/roles').OrgRole };
+    if (!perReq) {
+      perReq = new Map();
+      orgContextCache.set(req, perReq);
+    }
+    perReq.set(cacheKey, ctx);
+  }
+  if (min && !atLeast(ctx.role, min)) throw ApiError.forbidden('Insufficient role');
+  return ctx;
 }
 
 /** Read gate (VIEWER and up). */
