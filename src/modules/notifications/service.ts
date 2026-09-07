@@ -2,7 +2,7 @@ import { ApiError } from '../../utils/ApiError';
 import type { Prisma } from '@prisma/client';
 import type { NotificationDTO, NotificationType } from './types';
 import { NotificationRepository } from './repository';
-import { normalizeScope, type ScopeInput } from '../../server/scope';
+import type { ScopeInput } from '../../server/scope';
 
 export type NotificationPublisher = (userId: string, notification: NotificationDTO) => void;
 
