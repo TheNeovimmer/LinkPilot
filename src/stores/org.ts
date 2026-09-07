@@ -74,3 +74,18 @@ export const useOrg = create<OrgState>((set, get) => ({
 export function activeOrgRole(orgs: OrgSummary[], activeId: string | null): OrgSummary['role'] | null {
   return orgs.find((o) => o.id === activeId)?.role ?? null;
 }
+
+/** Client-side write gate mirror (server still enforces). VIEWERs see read-only UI. */
+export function useCanWrite(): boolean {
+  const orgs = useOrg((s) => s.orgs);
+  const activeId = useOrg((s) => s.activeOrgId);
+  const role = activeOrgRole(orgs, activeId);
+  return role === null || role === 'OWNER' || role === 'ADMIN' || role === 'MEMBER';
+}
+
+export function useCanInvite(): boolean {
+  const orgs = useOrg((s) => s.orgs);
+  const activeId = useOrg((s) => s.activeOrgId);
+  const role = activeOrgRole(orgs, activeId);
+  return role === null || role === 'OWNER' || role === 'ADMIN';
+}
