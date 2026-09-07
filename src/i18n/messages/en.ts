@@ -21,6 +21,8 @@ export const messages: Messages = {
   'nav.reminders': 'Reminders',
   'nav.activity': 'Activity',
   'nav.settings': 'Settings',
+  'nav.workspaces': 'Workspaces',
+  'nav.admin': 'Admin',
 
   // Topbar
   'topbar.search': 'Search…',

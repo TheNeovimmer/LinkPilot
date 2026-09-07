@@ -30,6 +30,37 @@ export async function requireUser(req: Request): Promise<AuthUser> {
   return user;
 }
 
+/** Workspace context resolved from x-org-id header, ?orgId query, or first membership (auto-creates personal workspace). */
+export interface OrgContext {
+  orgId: string;
+  role: import('../modules/rbac/roles').OrgRole;
+}
+
+export async function requireOrg(req: Request, user: AuthUser, min?: import('../modules/rbac/roles').OrgRole): Promise<OrgContext> {
+  const { organizationService } = await import('../modules/organizations/service');
+  const { atLeast } = await import('../modules/rbac/roles');
+  const header = req.headers.get('x-org-id');
+  const query = new URL(req.url).searchParams.get('orgId');
+  let orgId = header || query || null;
+  if (!orgId) {
+    const orgs = await organizationService.listForUser(user.id);
+    orgId = orgs[0]?.id ?? null;
+  }
+  if (!orgId) throw ApiError.forbidden('No workspace');
+  const m = await organizationService.membershipOf(user.id, orgId);
+  if (!m) throw ApiError.forbidden('Not a member of this workspace');
+  const role = m.role as import('../modules/rbac/roles').OrgRole;
+  if (min && !atLeast(role, min)) throw ApiError.forbidden('Insufficient role');
+  return { orgId, role };
+}
+
+/** Platform owner check (SUPER_ADMIN). */
+export async function requireSuperAdmin(user: AuthUser): Promise<void> {
+  const { prisma } = await import('../database/prisma');
+  const row = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
+  if (row?.platformRole !== 'SUPER_ADMIN') throw ApiError.forbidden('Platform admin only');
+}
+
 // --- response envelope -----------------------------------------------------
 
 export function ok<T>(data: T, meta?: { page: number; limit: number; total: number; totalPages: number }): Response {

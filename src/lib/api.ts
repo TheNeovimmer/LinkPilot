@@ -8,6 +8,16 @@ export const api = axios.create({
   timeout: 30_000,
 });
 
+api.interceptors.request.use((config) => {
+  try {
+    const active = localStorage.getItem('linkpilot.activeOrg');
+    if (active && !config.headers['x-org-id']) config.headers['x-org-id'] = active;
+  } catch {
+    /* private mode */
+  }
+  return config;
+});
+
 api.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -47,6 +57,7 @@ export interface SessionUser {
   name?: string | null;
   image?: string | null;
   twoFactorEnabled?: boolean;
+  platformRole?: 'USER' | 'SUPER_ADMIN';
 }
 
 export async function getSession(): Promise<SessionUser | null> {

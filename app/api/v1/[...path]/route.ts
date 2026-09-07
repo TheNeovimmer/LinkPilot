@@ -1,4 +1,7 @@
-import { handle, requireUser, ok, created, noContent, rawJson, sseResponse, type AuthUser } from '@/server/http';
+import { handle, requireUser, requireOrg, requireSuperAdmin, ok, created, noContent, rawJson, sseResponse, type AuthUser } from '@/server/http';
+import { organizationService } from '@/modules/organizations/service';
+import { createOrgSchema, updateOrgSchema, inviteSchema, updateMemberRoleSchema } from '@/modules/organizations/schema';
+import { normalizeRole } from '@/modules/rbac/roles';
 import { ApiError } from '@/utils/ApiError';
 import { getAiClient, getAiSettingsView, writeAiSettings } from '@/modules/ai/config';
 import type { AiService } from '@/modules/ai/service';
@@ -159,10 +162,12 @@ function asServiceInput<T>(value: unknown): T {
 // ---- module handlers --------------------------------------------------------
 
 async function handleAuth(req: Request, user: AuthUser): Promise<Response> {
-  void user;
   const { auth } = await import('@/modules/auth/auth');
+  const { prisma } = await import('@/database/prisma');
   const session = await auth.api.getSession({ headers: req.headers });
-  return ok(session ? { user: session.user } : null);
+  if (!session?.user) return ok(null);
+  const row = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
+  return ok({ user: { ...session.user, platformRole: row?.platformRole ?? 'USER' } });
 }
 
 async function handleUsers(req: Request, method: string, path: string[], user: AuthUser): Promise<Response> {
@@ -350,6 +355,20 @@ const method = (req: Request) => req.method;
 async function dispatch(req: Request, path: string[], user: AuthUser): Promise<Response> {
   const m = method(req);
   const [resource, ...rest] = path;
+
+  const DOMAIN_READ = new Set(['companies', 'conversations', 'recruiters', 'jobs', 'applications', 'interviews', 'notes', 'reminders', 'notifications', 'dashboard', 'attachments']);
+  if (DOMAIN_READ.has(resource)) {
+    const { prisma } = await import('@/database/prisma');
+    const me = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
+    if (me?.platformRole !== 'SUPER_ADMIN') {
+      await requireOrg(req, user, m === 'GET' ? 'VIEWER' : 'MEMBER');
+    }
+  }
+  if (resource === 'ai' && m === 'POST') {
+    const { prisma } = await import('@/database/prisma');
+    const me = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
+    if (me?.platformRole !== 'SUPER_ADMIN') await requireOrg(req, user, 'MEMBER');
+  }
 
   switch (resource) {
     case 'auth':
@@ -544,6 +563,10 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
       return handleAi(req, m, rest[0], user);
     case 'attachments':
       return handleAttachments(req, m, rest[0], user);
+    case 'organizations':
+      return handleOrganizations(req, m, rest, user);
+    case 'admin':
+      return handleAdmin(req, m, rest, user);
     default:
       throw new Error(`Not found: ${resource}`);
   }
@@ -628,4 +651,56 @@ async function handleAi(req: Request, m: string, action: string | undefined, use
     return ok(await aiService.summarizeConversation(user.id, body.conversationId as string));
   }
   throw new Error('Not found: ai');
+}
+
+async function handleOrganizations(req: Request, m: string, rest: string[], user: AuthUser): Promise<Response> {
+  if (rest[0] === 'invites' && rest[1] === 'mine' && m === 'GET') return ok(await organizationService.myInvites(user.id));
+  if (rest[0] === 'invites' && rest[1] === 'accept' && m === 'POST') {
+    const body = await parseBody(req) as { token?: string };
+    if (!body.token) throw ApiError.badRequest('Missing token');
+    return ok(await organizationService.acceptInvite(user.id, body.token));
+  }
+  if (!rest[0] && m === 'GET') return ok(await organizationService.listForUser(user.id));
+  if (!rest[0] && m === 'POST') return created(await organizationService.create(user.id, createOrgSchema.parse(await parseBody(req))));
+  const orgId = rest[0];
+  if (!orgId) throw new Error('Not found: organizations');
+  if (rest[1] === 'members' && !rest[2] && m === 'GET') return ok(await organizationService.listMembers(user.id, orgId));
+  if (rest[1] === 'members' && rest[2] && m === 'PATCH') {
+    const body = updateMemberRoleSchema.parse(await parseBody(req));
+    return ok(await organizationService.updateMemberRole(user.id, orgId, rest[2], normalizeRole(body.role)));
+  }
+  if (rest[1] === 'members' && rest[2] && m === 'DELETE') {
+    await organizationService.removeMember(user.id, orgId, rest[2]);
+    return noContent();
+  }
+  if (rest[1] === 'invites' && !rest[2] && m === 'GET') return ok(await organizationService.listInvites(user.id, orgId));
+  if (rest[1] === 'invites' && !rest[2] && m === 'POST') {
+    const body = inviteSchema.parse(await parseBody(req));
+    return created(await organizationService.invite(user.id, orgId, body.email, normalizeRole(body.role)));
+  }
+  if (rest[1] === 'invites' && rest[2] && m === 'DELETE') {
+    await organizationService.revokeInvite(user.id, orgId, rest[2]);
+    return noContent();
+  }
+  if (!rest[1] && m === 'GET') return ok(await organizationService.get(user.id, orgId));
+  if (!rest[1] && m === 'PATCH') return ok(await organizationService.update(user.id, orgId, updateOrgSchema.parse(await parseBody(req))));
+  if (!rest[1] && m === 'DELETE') {
+    await organizationService.remove(user.id, orgId);
+    return noContent();
+  }
+  throw new Error('Not found: organizations');
+}
+
+async function handleAdmin(req: Request, m: string, rest: string[], user: AuthUser): Promise<Response> {
+  await requireSuperAdmin(user);
+  const { prisma } = await import('@/database/prisma');
+  if (rest[0] === 'orgs' && m === 'GET') {
+    const orgs = await prisma.organization.findMany({ orderBy: { createdAt: 'desc' }, take: 100, include: { _count: { select: { memberships: true } } } });
+    return ok(orgs);
+  }
+  if (rest[0] === 'users' && m === 'GET') {
+    const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 100, select: { id: true, email: true, name: true, platformRole: true, createdAt: true } });
+    return ok(users);
+  }
+  throw new Error('Not found: admin');
 }

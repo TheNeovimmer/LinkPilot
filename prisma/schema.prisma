@@ -17,18 +17,21 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id               String     @id @default(cuid())
+  id               String       @id @default(cuid())
   name             String?
-  email            String     @unique
-  emailVerified    Boolean    @default(false)
+  email            String       @unique
+  emailVerified    Boolean      @default(false)
   image            String?
-  twoFactorEnabled Boolean    @default(false)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  twoFactorEnabled Boolean      @default(false)
+  platformRole     PlatformRole @default(USER)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
   accounts         Account[]
   sessions         Session[]
   profile          Profile?
   twoFactor        TwoFactor?
+  memberships      Membership[]
+  sentInvites      OrgInvitation[] @relation("InvitedBy")
 }
 
 model TwoFactor {
@@ -397,6 +400,7 @@ model Notification {
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String?
+  orgId     String?
   action    String
   entity    String?
   entityId  String?
@@ -406,4 +410,74 @@ model AuditLog {
 
   @@index([userId, createdAt])
   @@index([action, createdAt])
+  @@index([orgId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// SaaS + RBAC (Phase 1: org membership, roles, invites)
+// Domain rows are still user-scoped; orgId lands on domain tables in Phase 1b.
+// ---------------------------------------------------------------------------
+
+enum PlatformRole {
+  USER
+  SUPER_ADMIN
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+model Organization {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  memberships Membership[]
+  invitations OrgInvitation[]
+
+  @@index([createdAt])
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      OrgRole  @default(MEMBER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, userId])
+  @@index([userId])
+  @@index([orgId, role])
+}
+
+model OrgInvitation {
+  id        String           @id @default(cuid())
+  orgId     String
+  org       Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  email     String
+  role      OrgRole          @default(MEMBER)
+  status    InvitationStatus @default(PENDING)
+  token     String           @unique @default(cuid())
+  expiresAt DateTime
+  invitedBy String?
+  inviter   User?            @relation("InvitedBy", fields: [invitedBy], references: [id], onDelete: SetNull)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([orgId, status])
+  @@index([email, status])
 }

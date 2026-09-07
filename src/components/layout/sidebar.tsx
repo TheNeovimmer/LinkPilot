@@ -14,9 +14,12 @@ import {
   Bell,
   History,
   Settings,
+  Building2 as WorkspaceIcon,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/stores/session';
+import { OrgSwitcher } from '@/components/layout/org-switcher';
 import { useLocale } from '@/stores/locale';
 import { initials } from '@/lib/utils';
 
@@ -32,7 +35,7 @@ const NAV = [
   { to: '/reminders', key: 'nav.reminders', icon: Bell },
 ];
 
-const SECONDARY_NAV = [{ to: '/activity', key: 'nav.activity', icon: History }];
+const SECONDARY_NAV = [{ to: '/activity', key: 'nav.activity', icon: History }, { to: '/workspaces', key: 'nav.workspaces', icon: WorkspaceIcon }];
 
 export function Sidebar() {
   const user = useSession((s) => s.user);
@@ -65,6 +68,10 @@ export function Sidebar() {
         </div>
       </div>
 
+      <div className="border-b border-border px-3 py-2">
+        <OrgSwitcher />
+      </div>
+
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
         {NAV.map(({ to, key, icon: Icon }) => {
@@ -93,6 +100,12 @@ export function Sidebar() {
 
       {/* Settings + user */}
       <div className="border-t border-border p-3">
+        {(user as { platformRole?: string } | null)?.platformRole === 'SUPER_ADMIN' ? (
+          <Link href="/admin" className={cn('mb-1', navClass(isActive('/admin')))}>
+            <ShieldCheck className={iconClass(isActive('/admin'))} strokeWidth={1.75} />
+            {t('nav.admin')}
+          </Link>
+        ) : null}
         <Link href="/settings" className={cn('mb-1', navClass(isActive('/settings')))}>
           <Settings className={iconClass(isActive('/settings'))} strokeWidth={1.75} />
           {t('nav.settings')}

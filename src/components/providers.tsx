@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from 'sonner';
 import { useSession } from '@/stores/session';
+import { useOrg } from '@/stores/org';
 import { useTheme } from '@/stores/theme';
 import { useLocale } from '@/stores/locale';
 import { usePreferences } from '@/stores/preferences';
@@ -17,16 +18,17 @@ const queryClient = new QueryClient({
 
 function Boot() {
   const initSession = useSession((s) => s.init);
+  const initOrg = useOrg((s) => s.init);
   const themeInit = useTheme((s) => s.init);
   const localeInit = useLocale((s) => s.init);
   const preferencesInit = usePreferences((s) => s.init);
 
   useEffect(() => {
-    void initSession();
+    void initSession().then(() => void useOrg.getState().init());
     themeInit();
     localeInit();
     preferencesInit();
-  }, [initSession, themeInit, localeInit, preferencesInit]);
+  }, [initSession, initOrg, themeInit, localeInit, preferencesInit]);
 
   return null;
 }
