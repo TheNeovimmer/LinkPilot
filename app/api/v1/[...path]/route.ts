@@ -483,19 +483,21 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
       throw new Error('Not found: applications');
     }
     case 'interviews': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'upcoming') return ok(await interviewService.upcoming(user.id));
+      if (m === 'GET' && id === 'upcoming') return ok(await interviewService.upcoming(scope));
       if (m === 'GET' && !id) {
-        const r = await interviewService.list(user.id, queryOf(req, interviewQuerySchema));
+        const r = await interviewService.list(scope, queryOf(req, interviewQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof interviewService.create>[1]>(createInterviewSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await interviewService.create(scope, asServiceInput<Parameters<typeof interviewService.create>[1]>(createInterviewSchema.parse(await parseBody(req)))));
       if (id) {
         interviewIdSchema.parse({ id });
-        if (m === 'GET') return ok(await interviewService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof interviewService.update>[2]>(updateInterviewSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await interviewService.get(scope, id));
+        if (m === 'PATCH') return ok(await interviewService.update(scope, id, asServiceInput<Parameters<typeof interviewService.update>[2]>(updateInterviewSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await interviewService.remove(user.id, id);
+          await interviewService.remove(scope, id);
           return noContent();
         }
       }
