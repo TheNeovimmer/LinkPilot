@@ -637,6 +637,8 @@ async function handleAi(req: Request, m: string, action: string | undefined, use
   }
 
   if (m !== 'POST' || !action) throw new Error('Not found: ai');
+  const { resolveDataScope } = await import('@/server/scope');
+  const scope = await resolveDataScope(req, user);
   const body = await parseBody(req);
   const client = await getAiClient(user.id);
 
@@ -646,7 +648,7 @@ async function handleAi(req: Request, m: string, action: string | undefined, use
       return Response.json({ success: false, error: { code: 'AI_NOT_CONFIGURED', message: 'AI is not configured. Add an API key on the Settings page or set AI_API_KEY in the environment.' } }, { status: 503 });
     }
     return sseResponse(async (write, signal) => {
-      const result = await aiService.draftReply(user.id, { conversationId: body.conversationId as string, extraContext: body.extraContext as string | undefined, tone: body.tone as string | undefined, signal }, (d) => write({ type: 'delta', text: d }));
+      const result = await aiService.draftReply(scope, { conversationId: body.conversationId as string, extraContext: body.extraContext as string | undefined, tone: body.tone as string | undefined, signal }, (d) => write({ type: 'delta', text: d }));
       write({ type: 'done', ...result });
     }, req);
   }
@@ -657,22 +659,22 @@ async function handleAi(req: Request, m: string, action: string | undefined, use
       return Response.json({ success: false, error: { code: 'AI_NOT_CONFIGURED', message: 'AI is not configured. Add an API key on the Settings page or set AI_API_KEY in the environment.' } }, { status: 503 });
     }
     return sseResponse(async (write, signal) => {
-      const result = await aiService.rewrite(user.id, { text: body.text as string, tone: body.tone as string | undefined, instruction: body.instruction as string | undefined, signal }, (d) => write({ type: 'delta', text: d }));
+      const result = await aiService.rewrite(scope, { text: body.text as string, tone: body.tone as string | undefined, instruction: body.instruction as string | undefined, signal }, (d) => write({ type: 'delta', text: d }));
       write({ type: 'done', ...result });
     }, req);
   }
 
   if (action === 'analyze-job') {
     analyzeJobSchema.parse(body);
-    return ok(await aiService.analyzeJob(user.id, body.jobId as string));
+    return ok(await aiService.analyzeJob(scope, body.jobId as string));
   }
   if (action === 'interview-prep') {
     interviewPrepSchema.parse(body);
-    return ok(await aiService.prepareInterview(user.id, body.interviewId as string));
+    return ok(await aiService.prepareInterview(scope, body.interviewId as string));
   }
   if (action === 'summarize') {
     summarizeSchema.parse(body);
-    return ok(await aiService.summarizeConversation(user.id, body.conversationId as string));
+    return ok(await aiService.summarizeConversation(scope, body.conversationId as string));
   }
   throw new Error('Not found: ai');
 }
