@@ -5,6 +5,7 @@ import { prisma } from '../../database/prisma';
 import type { ApplicationStatus, JobStatus } from '@prisma/client';
 import type { ApplicationDTO } from './types';
 import { ApplicationRepository } from './repository';
+import { normalizeScope, scopeIdWhere, type ScopeInput } from '../../server/scope';
 
 /** Application → linked Job status (null = don't touch the job). */
 const STATUS_TO_JOB: Partial<Record<ApplicationStatus, JobStatus>> = {
@@ -38,21 +39,23 @@ function applyFirstResponse(
 export class ApplicationService {
   constructor(private readonly repo: ApplicationRepository) {}
 
-  async list(userId: string, query: Parameters<ApplicationRepository['list']>[1]) {
-    return this.repo.list(userId, query);
+  async list(scopeInput: ScopeInput, query: Parameters<ApplicationRepository['list']>[1]) {
+    return this.repo.list(scopeInput, query);
   }
 
-  async get(userId: string, id: string): Promise<ApplicationDTO> {
-    const application = await this.repo.findById(userId, id);
+  async get(scopeInput: ScopeInput, id: string): Promise<ApplicationDTO> {
+    const application = await this.repo.findById(scopeInput, id);
     if (!application) throw ApiError.notFound('Application not found');
     return application;
   }
 
   /** Keep the linked job's status in sync and notify on milestones. */
-  private async applyStatusSideEffects(userId: string, application: ApplicationDTO): Promise<void> {
+  private async applyStatusSideEffects(scopeInput: ScopeInput, application: ApplicationDTO): Promise<void> {
+    const { userId } = normalizeScope(scopeInput);
+    const scope = normalizeScope(scopeInput);
     const jobStatus = STATUS_TO_JOB[application.status];
     if (jobStatus && application.jobId) {
-      await prisma.job.updateMany({ where: { id: application.jobId, userId }, data: { status: jobStatus } });
+      await prisma.job.updateMany({ where: scopeIdWhere(scope, application.jobId), data: { status: jobStatus } });
     }
     const milestone = MILESTONES[application.status];
     if (milestone) {
@@ -66,59 +69,63 @@ export class ApplicationService {
     }
   }
 
-  async create(userId: string, data: Parameters<ApplicationRepository['create']>[1]): Promise<ApplicationDTO> {
+  async create(scopeInput: ScopeInput, data: Parameters<ApplicationRepository['create']>[1]): Promise<ApplicationDTO> {
+    const { userId, orgId } = normalizeScope(scopeInput);
     // First submitted application auto-records the applied date.
     if (data.status === 'SUBMITTED' && !data.appliedAt) data.appliedAt = new Date();
     // Records a first response if created directly in a replied state.
     if (data.status && RESPONDED_STATUSES.has(data.status)) data.firstResponseAt = new Date();
-    const application = await this.repo.create(userId, data);
-    await this.applyStatusSideEffects(userId, application);
-    await auditService.log(userId, 'application.create', 'application', application.id, { status: application.status });
+    const application = await this.repo.create(scopeInput, data);
+    await this.applyStatusSideEffects(scopeInput, application);
+    await auditService.log(userId, 'application.create', 'application', application.id, { status: application.status }, undefined, orgId || undefined);
     return application;
   }
 
-  async update(userId: string, id: string, data: Parameters<ApplicationRepository['update']>[2]): Promise<ApplicationDTO> {
-    const current = await this.get(userId, id);
+  async update(scopeInput: ScopeInput, id: string, data: Parameters<ApplicationRepository['update']>[2]): Promise<ApplicationDTO> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    const current = await this.get(scopeInput, id);
     const merged = { ...current, ...data };
     // Auto-set appliedAt when the application first becomes submitted.
     if (merged.status === 'SUBMITTED' && !merged.appliedAt) data.appliedAt = new Date();
     // Auto-record first employer response.
     if (data.status) applyFirstResponse(data, current);
-    const updated = await this.repo.update(userId, id, data);
+    const updated = await this.repo.update(scopeInput, id, data);
     const result = updated!;
     if (result.status !== current.status || result.jobId !== current.jobId) {
-      await this.applyStatusSideEffects(userId, result);
+      await this.applyStatusSideEffects(scopeInput, result);
     }
-    await auditService.log(userId, 'application.update', 'application', id, { status: result.status });
+    await auditService.log(userId, 'application.update', 'application', id, { status: result.status }, undefined, orgId || undefined);
     return result;
   }
 
-  async remove(userId: string, id: string): Promise<void> {
-    await this.get(userId, id);
-    await this.repo.remove(userId, id);
-    await auditService.log(userId, 'application.delete', 'application', id);
+  async remove(scopeInput: ScopeInput, id: string): Promise<void> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    await this.get(scopeInput, id);
+    await this.repo.remove(scopeInput, id);
+    await auditService.log(userId, 'application.delete', 'application', id, undefined, undefined, orgId || undefined);
   }
 
   /** Bulk status move — runs the same job-sync + milestone logic per application. */
-  async bulkUpdate(userId: string, ids: string[], status: ApplicationStatus): Promise<number> {
+  async bulkUpdate(scopeInput: ScopeInput, ids: string[], status: ApplicationStatus): Promise<number> {
+    const { userId, orgId } = normalizeScope(scopeInput);
     let updated = 0;
     for (const id of ids) {
-      const current = await this.repo.findById(userId, id);
+      const current = await this.repo.findById(scopeInput, id);
       if (!current || current.status === status) continue;
       const data: Parameters<ApplicationRepository['update']>[2] = { status };
       if (status === 'SUBMITTED' && !current.appliedAt) data.appliedAt = new Date();
       applyFirstResponse(data, current);
-      const result = await this.repo.update(userId, id, data);
+      const result = await this.repo.update(scopeInput, id, data);
       if (result) {
-        await this.applyStatusSideEffects(userId, result);
+        await this.applyStatusSideEffects(scopeInput, result);
         updated++;
       }
     }
-    await auditService.log(userId, 'application.bulkUpdate', 'application', undefined, { count: updated, status });
+    await auditService.log(userId, 'application.bulkUpdate', 'application', undefined, { count: updated, status }, undefined, orgId || undefined);
     return updated;
   }
 
-  async pipeline(userId: string) {
-    return this.repo.pipeline(userId);
+  async pipeline(scopeInput: ScopeInput) {
+    return this.repo.pipeline(scopeInput);
   }
 }
