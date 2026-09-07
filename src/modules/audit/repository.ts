@@ -4,6 +4,7 @@ import { parsePagination, prismaTakeSkip, buildMeta } from '../../utils/paginati
 import type { z } from 'zod';
 import type { auditQuerySchema } from './schema';
 import type { AuditLogDTO } from './types';
+import { normalizeScope, scopeAndWhere, type ScopeInput } from '../../server/scope';
 
 type ListQuery = z.infer<typeof auditQuerySchema>;
 
@@ -20,10 +21,10 @@ export class AuditLogRepository {
     await prisma.auditLog.create({ data });
   }
 
-  async list(userId: string, query: ListQuery) {
+  async list(scopeInput: ScopeInput, query: ListQuery) {
+    const scope = normalizeScope(scopeInput);
     const { page, limit } = parsePagination(query);
-    const where: Prisma.AuditLogWhereInput = {
-      userId,
+    const where: Prisma.AuditLogWhereInput = scopeAndWhere(scope, {
       ...(query.action ? { action: query.action } : {}),
       ...(query.entity ? { entity: query.entity } : {}),
       ...(query.from || query.to
@@ -34,7 +35,7 @@ export class AuditLogRepository {
             },
           }
         : {}),
-    };
+    });
     const [rows, total] = await prisma.$transaction([
       prisma.auditLog.findMany({
         where,
