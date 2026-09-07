@@ -5,6 +5,7 @@ import type { z } from 'zod';
 import type { jobQuerySchema } from './schema';
 import type { JobAnalysis } from '../../prompts/analyzeJob';
 import type { JobDTO, JobStats } from './types';
+import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, scopeReadWhere, type ScopeInput } from '../../server/scope';
 
 type ListQuery = z.infer<typeof jobQuerySchema>;
 
@@ -28,15 +29,15 @@ function textSearch(q: string): Prisma.JobWhereInput {
 }
 
 export class JobRepository {
-  async list(userId: string, query: ListQuery) {
+  async list(scopeInput: ScopeInput, query: ListQuery) {
+    const scope = normalizeScope(scopeInput);
     const { page, limit } = parsePagination(query);
-    const where: Prisma.JobWhereInput = {
-      userId,
+    const where: Prisma.JobWhereInput = scopeAndWhere(scope, {
       ...(query.status ? { status: query.status } : {}),
       ...(query.companyId ? { companyId: query.companyId } : {}),
       ...(query.remote !== undefined ? { remote: query.remote } : {}),
       ...(query.q ? textSearch(query.q) : {}),
-    };
+    });
 
     const rows = await prisma.job.findMany({
       where,
@@ -48,15 +49,17 @@ export class JobRepository {
     return { items: rows.map(mapJob), meta: buildMeta({ page, limit }, total) };
   }
 
-  async findById(userId: string, id: string): Promise<JobDTO | null> {
-    const row = await prisma.job.findFirst({ where: { id, userId }, include });
+  async findById(scopeInput: ScopeInput, id: string): Promise<JobDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.job.findFirst({ where: scopeIdWhere(scope, id), include });
     return row ? mapJob(row) : null;
   }
 
   /** Slim view consumed by the AI service. */
-  async findAiView(userId: string, id: string) {
+  async findAiView(scopeInput: ScopeInput, id: string) {
+    const scope = normalizeScope(scopeInput);
     const row = await prisma.job.findFirst({
-      where: { id, userId },
+      where: scopeIdWhere(scope, id),
       select: {
         id: true,
         title: true,
@@ -72,7 +75,7 @@ export class JobRepository {
   }
 
   async create(
-    userId: string,
+    scopeInput: ScopeInput,
     data: {
       title: string;
       companyId?: string;
@@ -86,12 +89,13 @@ export class JobRepository {
       postedAt?: Date | null;
     },
   ): Promise<JobDTO> {
-    const row = await prisma.job.create({ data: { userId, ...data }, include });
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.job.create({ data: { ...scopeCreateData(scope), ...data }, include });
     return mapJob(row);
   }
 
   async update(
-    userId: string,
+    scopeInput: ScopeInput,
     id: string,
     data: Partial<{
       title: string;
@@ -108,24 +112,28 @@ export class JobRepository {
       postedAt: Date | null;
     }>,
   ): Promise<JobDTO | null> {
-    const result = await prisma.job.updateMany({ where: { id, userId }, data });
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.job.updateMany({ where: scopeIdWhere(scope, id), data });
     if (result.count === 0) return null;
-    return this.findById(userId, id);
+    return this.findById(scope, id);
   }
 
-  async remove(userId: string, id: string): Promise<boolean> {
-    const result = await prisma.job.deleteMany({ where: { id, userId } });
+  async remove(scopeInput: ScopeInput, id: string): Promise<boolean> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.job.deleteMany({ where: scopeIdWhere(scope, id) });
     return result.count > 0;
   }
 
-  async bulkUpdate(userId: string, ids: string[], status: JobStatus): Promise<number> {
-    const result = await prisma.job.updateMany({ where: { id: { in: ids }, userId }, data: { status } });
+  async bulkUpdate(scopeInput: ScopeInput, ids: string[], status: JobStatus): Promise<number> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.job.updateMany({ where: { id: { in: ids }, AND: [scopeReadWhere(scope)] }, data: { status } });
     return result.count;
   }
 
-  async updateAnalysis(userId: string, id: string, fitScore: number, analysis: JobAnalysis): Promise<void> {
+  async updateAnalysis(scopeInput: ScopeInput, id: string, fitScore: number, analysis: JobAnalysis): Promise<void> {
+    const scope = normalizeScope(scopeInput);
     await prisma.job.updateMany({
-      where: { id, userId },
+      where: scopeIdWhere(scope, id),
       data: { fitScore, analysis: analysis as unknown as Prisma.InputJsonValue },
     });
   }
@@ -140,28 +148,32 @@ export class JobRepository {
   }
 
   /** pgvector semantic search; falls back to caller if vector ops unavailable. */
-  async semanticSearch(userId: string, embedding: number[], limit: number): Promise<JobDTO[]> {
+  async semanticSearch(scopeInput: ScopeInput, embedding: number[], limit: number): Promise<JobDTO[]> {
+    const scope = normalizeScope(scopeInput);
     const rows = await prisma.$queryRawUnsafe<JobRow[]>(
       `SELECT j.*, c.name AS "companyName",
               (SELECT count(*)::int FROM "Application" a WHERE a."jobId" = j.id) AS "applicationCount",
               (SELECT count(*)::int FROM "Interview" i WHERE i."jobId" = j.id) AS "interviewCount"
        FROM "Job" j LEFT JOIN "Company" c ON c.id = j."companyId"
-       WHERE j."userId" = $1 AND j.embedding IS NOT NULL
-       ORDER BY j.embedding <-> $2::vector
-       LIMIT $3`,
-      userId,
+       WHERE (j."orgId" = $1 OR (j."orgId" IS NULL AND j."userId" = $2)) AND j.embedding IS NOT NULL
+       ORDER BY j.embedding <-> $3::vector
+       LIMIT $4`,
+      scope.orgId || '__none__',
+      scope.userId,
       `[${embedding.join(',')}]`,
       limit,
     );
     return rows.map(mapJob);
   }
 
-  async stats(userId: string): Promise<JobStats> {
-    const grouped = await prisma.job.groupBy({ by: ['status'], where: { userId }, _count: true });
+  async stats(scopeInput: ScopeInput): Promise<JobStats> {
+    const scope = normalizeScope(scopeInput);
+    const where = scopeReadWhere(scope);
+    const grouped = await prisma.job.groupBy({ by: ['status'], where, _count: true });
     const byStatus = Object.fromEntries(grouped.map((g) => [g.status, g._count])) as Record<JobStatus, number>;
-    const total = await prisma.job.count({ where: { userId } });
-    const analyzed = await prisma.job.count({ where: { userId, fitScore: { not: null } } });
-    const avg = await prisma.job.aggregate({ where: { userId, fitScore: { not: null } }, _avg: { fitScore: true } });
+    const total = await prisma.job.count({ where });
+    const analyzed = await prisma.job.count({ where: { AND: [where, { fitScore: { not: null } }] } });
+    const avg = await prisma.job.aggregate({ where: { AND: [where, { fitScore: { not: null } }] }, _avg: { fitScore: true } });
     return {
       byStatus: {
         WATCHLIST: byStatus.WATCHLIST ?? 0,

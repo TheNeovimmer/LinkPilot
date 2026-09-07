@@ -2,6 +2,7 @@ import { ApiError } from '../../utils/ApiError';
 import type { Prisma } from '@prisma/client';
 import type { NotificationDTO, NotificationType } from './types';
 import { NotificationRepository } from './repository';
+import type { ScopeInput } from '../../server/scope';
 
 export type NotificationPublisher = (userId: string, notification: NotificationDTO) => void;
 
@@ -14,6 +15,7 @@ export class NotificationService {
   /** Persist a notification and push it to the user's live socket connection. */
   async create(data: {
     userId: string;
+    orgId?: string | null;
     type: NotificationType;
     title: string;
     body?: string;
@@ -24,25 +26,25 @@ export class NotificationService {
     return notification;
   }
 
-  async list(userId: string, query: Parameters<NotificationRepository['list']>[1]) {
-    return this.repo.list(userId, query);
+  async list(scopeInput: ScopeInput, query: Parameters<NotificationRepository['list']>[1]) {
+    return this.repo.list(scopeInput, query);
   }
 
-  async unreadCount(userId: string) {
-    return this.repo.unreadCount(userId);
+  async unreadCount(scopeInput: ScopeInput) {
+    return this.repo.unreadCount(scopeInput);
   }
 
-  async markRead(userId: string, id: string): Promise<void> {
-    const marked = await this.repo.markRead(userId, id);
+  async markRead(scopeInput: ScopeInput, id: string): Promise<void> {
+    const marked = await this.repo.markRead(scopeInput, id);
     if (!marked) throw ApiError.notFound('Notification not found');
   }
 
-  async markAllRead(userId: string): Promise<number> {
-    return this.repo.markAllRead(userId);
+  async markAllRead(scopeInput: ScopeInput): Promise<number> {
+    return this.repo.markAllRead(scopeInput);
   }
 
-  async remove(userId: string, id: string): Promise<void> {
-    const removed = await this.repo.remove(userId, id);
+  async remove(scopeInput: ScopeInput, id: string): Promise<void> {
+    const removed = await this.repo.remove(scopeInput, id);
     if (!removed) throw ApiError.notFound('Notification not found');
   }
 }

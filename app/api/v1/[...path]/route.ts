@@ -224,14 +224,16 @@ async function handleAvatar(req: Request, user: AuthUser): Promise<Response> {
 
 // Attachments : upload / list / delete (multipart, stored under UPLOAD_DIR).
 async function handleAttachments(req: Request, m: string, id: string | undefined, user: AuthUser): Promise<Response> {
+  const { resolveDataScope } = await import('@/server/scope');
+  const scope = await resolveDataScope(req, user);
   if (m === 'GET') {
     const q = new URL(req.url).searchParams;
     const applicationId = q.get('applicationId') || null;
     const noteId = q.get('noteId') || null;
-    return ok(await attachmentService.list(user.id, applicationId, noteId));
+    return ok(await attachmentService.list(scope, applicationId, noteId));
   }
   if (m === 'DELETE' && id) {
-    await attachmentService.remove(user.id, id);
+    await attachmentService.remove(scope, id);
     return noContent();
   }
   if (m === 'POST' && !id) {
@@ -262,7 +264,7 @@ async function handleAttachments(req: Request, m: string, id: string | undefined
     writeUpload(filename, buf);
 
     try {
-      const attachment = await attachmentService.create(user.id, {
+      const attachment = await attachmentService.create(scope, {
         applicationId,
         noteId,
         kind,
@@ -292,19 +294,21 @@ function sniffImage(buf: Buffer, mimetype: string): boolean {
 
 // Companies
 async function handleCompanies(req: Request, method: string, path: string[], user: AuthUser): Promise<Response> {
+  const { resolveDataScope } = await import('@/server/scope');
+  const scope = await resolveDataScope(req, user);
   const id = path[1];
   if (method === 'GET' && !id && id !== 'all') {
-    const r = await companyService.list(user.id, queryOf(req, companyQuerySchema));
+    const r = await companyService.list(scope, queryOf(req, companyQuerySchema));
     return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
   }
-  if (method === 'GET' && id === 'all') return ok(await companyService.all(user.id));
-  if (method === 'POST' && !id) return created(await asServiceInput<Parameters<typeof companyService.create>[1]>(createCompanySchema.parse(await parseBody(req))));
+  if (method === 'GET' && id === 'all') return ok(await companyService.all(scope));
+  if (method === 'POST' && !id) return created(await companyService.create(scope, asServiceInput<Parameters<typeof companyService.create>[1]>(createCompanySchema.parse(await parseBody(req)))));
   if (id && id !== 'all') {
     companyIdSchema.parse({ id });
-    if (method === 'GET') return ok(await companyService.get(user.id, id));
-    if (method === 'PATCH') return ok(await asServiceInput<Parameters<typeof companyService.update>[2]>(updateCompanySchema.parse(await parseBody(req))));
+    if (method === 'GET') return ok(await companyService.get(scope, id));
+    if (method === 'PATCH') return ok(await companyService.update(scope, id, asServiceInput<Parameters<typeof companyService.update>[2]>(updateCompanySchema.parse(await parseBody(req)))));
     if (method === 'DELETE') {
-      await companyService.remove(user.id, id);
+      await companyService.remove(scope, id);
       return noContent();
     }
   }
@@ -380,185 +384,206 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
     case 'companies':
       return handleCompanies(req, m, path, user);
     case 'conversations': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const cid = rest[0];
       if (cid && rest[1] === 'messages') return handleMessages(req, m, rest.slice(2), user, cid);
       if (m === 'GET' && !cid) {
-        const r = await conversationService.list(user.id, queryOf(req, conversationQuerySchema));
+        const r = await conversationService.list(scope, queryOf(req, conversationQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !cid) return created(await asServiceInput<Parameters<typeof conversationService.create>[1]>(createConversationSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !cid) return created(await conversationService.create(scope, asServiceInput<Parameters<typeof conversationService.create>[1]>(createConversationSchema.parse(await parseBody(req)))));
       if (cid) {
         conversationIdSchema.parse({ id: cid });
-        if (m === 'GET') return ok(await conversationService.get(user.id, cid));
-        if (m === 'PATCH') return ok(await conversationService.update(user.id, cid, updateConversationSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await conversationService.get(scope, cid));
+        if (m === 'PATCH') return ok(await conversationService.update(scope, cid, updateConversationSchema.parse(await parseBody(req))));
         if (m === 'DELETE') {
-          await conversationService.remove(user.id, cid);
+          await conversationService.remove(scope, cid);
           return noContent();
         }
       }
       throw new Error('Not found: conversations');
     }
     case 'recruiters': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'pipeline') return ok(await recruiterService.pipeline(user.id));
+      if (m === 'GET' && id === 'pipeline') return ok(await recruiterService.pipeline(scope));
       if (m === 'GET' && !id) {
-        const r = await recruiterService.list(user.id, queryOf(req, recruiterQuerySchema));
+        const r = await recruiterService.list(scope, queryOf(req, recruiterQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof recruiterService.create>[1]>(createRecruiterSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await recruiterService.create(scope, asServiceInput<Parameters<typeof recruiterService.create>[1]>(createRecruiterSchema.parse(await parseBody(req)))));
       if (isId(id)) {
         recruiterIdSchema.parse({ id });
-        if (m === 'GET') return ok(await recruiterService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof recruiterService.update>[2]>(updateRecruiterSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await recruiterService.get(scope, id));
+        if (m === 'PATCH') return ok(await recruiterService.update(scope, id, asServiceInput<Parameters<typeof recruiterService.update>[2]>(updateRecruiterSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await recruiterService.remove(user.id, id);
+          await recruiterService.remove(scope, id);
           return noContent();
         }
       }
       throw new Error('Not found: recruiters');
     }
     case 'jobs': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'stats') return ok(await jobService.stats(user.id));
-      if (m === 'POST' && id === 'import') return created(await jobService.importFromText(user.id, importJobSchema.parse(await parseBody(req)).text));
+      if (m === 'GET' && id === 'stats') return ok(await jobService.stats(scope));
+      if (m === 'POST' && id === 'import') return created(await jobService.importFromText(scope, importJobSchema.parse(await parseBody(req)).text));
       if (m === 'PATCH' && id === 'bulk') {
         const body = bulkUpdateJobSchema.parse(await parseBody(req));
-        return ok({ updated: await jobService.bulkUpdate(user.id, body.ids, body.status) });
+        return ok({ updated: await jobService.bulkUpdate(scope, body.ids, body.status) });
       }
       if (m === 'POST' && id === 'semantic') {
         const body = semanticSearchSchema.parse(await parseBody(req));
         const client = await getAiClient(user.id);
         try {
           const embedding = await client.embed(body.q);
-          return ok({ items: await jobService.semanticSearch(user.id, embedding, body.limit ?? 10), mode: 'semantic' });
+          return ok({ items: await jobService.semanticSearch(scope, embedding, body.limit ?? 10), mode: 'semantic' });
         } catch {
           // No embedding model / vector op unavailable → text search fallback.
-          const result = await jobService.list(user.id, { q: body.q, limit: body.limit ?? 10, page: 1 } as never);
+          const result = await jobService.list(scope, { q: body.q, limit: body.limit ?? 10, page: 1 } as never);
           return ok({ items: result.items, mode: 'text' });
         }
       }
       if (m === 'GET' && !id) {
-        const r = await jobService.list(user.id, queryOf(req, jobQuerySchema));
+        const r = await jobService.list(scope, queryOf(req, jobQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof jobService.create>[1]>(createJobSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await jobService.create(scope, asServiceInput<Parameters<typeof jobService.create>[1]>(createJobSchema.parse(await parseBody(req)))));
       if (id) {
         jobIdSchema.parse({ id });
-        if (m === 'GET') return ok(await jobService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof jobService.update>[2]>(updateJobSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await jobService.get(scope, id));
+        if (m === 'PATCH') return ok(await jobService.update(scope, id, asServiceInput<Parameters<typeof jobService.update>[2]>(updateJobSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await jobService.remove(user.id, id);
+          await jobService.remove(scope, id);
           return noContent();
         }
       }
       throw new Error('Not found: jobs');
     }
     case 'applications': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'pipeline') return ok(await applicationService.pipeline(user.id));
+      if (m === 'GET' && id === 'pipeline') return ok(await applicationService.pipeline(scope));
       if (m === 'PATCH' && id === 'bulk') {
         const body = bulkApplicationSchema.parse(await parseBody(req));
-        return ok({ updated: await applicationService.bulkUpdate(user.id, body.ids, body.status) });
+        return ok({ updated: await applicationService.bulkUpdate(scope, body.ids, body.status) });
       }
       if (m === 'GET' && !id) {
-        const r = await applicationService.list(user.id, queryOf(req, applicationQuerySchema));
+        const r = await applicationService.list(scope, queryOf(req, applicationQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof applicationService.create>[1]>(createApplicationSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await applicationService.create(scope, asServiceInput<Parameters<typeof applicationService.create>[1]>(createApplicationSchema.parse(await parseBody(req)))));
       if (id) {
         applicationIdSchema.parse({ id });
-        if (m === 'GET') return ok(await applicationService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof applicationService.update>[2]>(updateApplicationSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await applicationService.get(scope, id));
+        if (m === 'PATCH') return ok(await applicationService.update(scope, id, asServiceInput<Parameters<typeof applicationService.update>[2]>(updateApplicationSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await applicationService.remove(user.id, id);
+          await applicationService.remove(scope, id);
           return noContent();
         }
       }
       throw new Error('Not found: applications');
     }
     case 'interviews': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'upcoming') return ok(await interviewService.upcoming(user.id));
+      if (m === 'GET' && id === 'upcoming') return ok(await interviewService.upcoming(scope));
       if (m === 'GET' && !id) {
-        const r = await interviewService.list(user.id, queryOf(req, interviewQuerySchema));
+        const r = await interviewService.list(scope, queryOf(req, interviewQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof interviewService.create>[1]>(createInterviewSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await interviewService.create(scope, asServiceInput<Parameters<typeof interviewService.create>[1]>(createInterviewSchema.parse(await parseBody(req)))));
       if (id) {
         interviewIdSchema.parse({ id });
-        if (m === 'GET') return ok(await interviewService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof interviewService.update>[2]>(updateInterviewSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await interviewService.get(scope, id));
+        if (m === 'PATCH') return ok(await interviewService.update(scope, id, asServiceInput<Parameters<typeof interviewService.update>[2]>(updateInterviewSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await interviewService.remove(user.id, id);
+          await interviewService.remove(scope, id);
           return noContent();
         }
       }
       throw new Error('Not found: interviews');
     }
     case 'notes': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'tags') return ok(await noteService.tags(user.id));
+      if (m === 'GET' && id === 'tags') return ok(await noteService.tags(scope));
       if (m === 'GET' && !id) {
-        const r = await noteService.list(user.id, queryOf(req, noteQuerySchema));
+        const r = await noteService.list(scope, queryOf(req, noteQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof noteService.create>[1]>(createNoteSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await noteService.create(scope, asServiceInput<Parameters<typeof noteService.create>[1]>(createNoteSchema.parse(await parseBody(req)))));
       if (id) {
         noteIdSchema.parse({ id });
-        if (m === 'GET') return ok(await noteService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof noteService.update>[2]>(updateNoteSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await noteService.get(scope, id));
+        if (m === 'PATCH') return ok(await noteService.update(scope, id, asServiceInput<Parameters<typeof noteService.update>[2]>(updateNoteSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await noteService.remove(user.id, id);
+          await noteService.remove(scope, id);
           return noContent();
         }
       }
       throw new Error('Not found: notes');
     }
     case 'reminders': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
       if (m === 'GET' && !id) {
-        const r = await reminderService.list(user.id, queryOf(req, reminderQuerySchema));
+        const r = await reminderService.list(scope, queryOf(req, reminderQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof reminderService.create>[1]>(createReminderSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await reminderService.create(scope, asServiceInput<Parameters<typeof reminderService.create>[1]>(createReminderSchema.parse(await parseBody(req)))));
       if (id) {
         reminderIdSchema.parse({ id });
-        if (m === 'GET') return ok(await reminderService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof reminderService.update>[2]>(updateReminderSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await reminderService.get(scope, id));
+        if (m === 'PATCH') return ok(await reminderService.update(scope, id, asServiceInput<Parameters<typeof reminderService.update>[2]>(updateReminderSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await reminderService.remove(user.id, id);
+          await reminderService.remove(scope, id);
           return noContent();
         }
       }
       throw new Error('Not found: reminders');
     }
     case 'notifications': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'unread-count') return ok({ count: await notificationService.unreadCount(user.id) });
-      if (m === 'POST' && id === 'read-all') return ok({ marked: await notificationService.markAllRead(user.id) });
+      if (m === 'GET' && id === 'unread-count') return ok({ count: await notificationService.unreadCount(scope) });
+      if (m === 'POST' && id === 'read-all') return ok({ marked: await notificationService.markAllRead(scope) });
       if (m === 'GET' && !id) {
-        const r = await notificationService.list(user.id, queryOf(req, notificationQuerySchema));
+        const r = await notificationService.list(scope, queryOf(req, notificationQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
       if (id && rest[1] === 'read' && m === 'PATCH') {
         notificationIdSchema.parse({ id });
-        await notificationService.markRead(user.id, id);
+        await notificationService.markRead(scope, id);
         return noContent();
       }
       if (id) {
         notificationIdSchema.parse({ id });
         if (m === 'DELETE') {
-          await notificationService.remove(user.id, id);
+          await notificationService.remove(scope, id);
           return noContent();
         }
       }
       throw new Error('Not found: notifications');
     }
-    case 'dashboard':
-      if (m === 'GET' && rest[0] === 'stats') return ok(await dashboardService.stats(user.id));
+    case 'dashboard': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
+      if (m === 'GET' && rest[0] === 'stats') return ok(await dashboardService.stats(scope));
       throw new Error('Not found: dashboard');
+    }
     case 'audit-logs': {
-      const r = await auditService.list(user.id, queryOf(req, auditQuerySchema));
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
+      const r = await auditService.list(scope, queryOf(req, auditQuerySchema));
       return ok((r as unknown as { items: unknown }).items, (r as unknown as { meta: unknown }).meta as never);
     }
     case 'ai':
@@ -577,23 +602,25 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
 // ---- messages (nested under conversations) ---------------------------------
 
 async function handleMessages(req: Request, m: string, rest: string[], user: AuthUser, conversationId: string): Promise<Response> {
+  const { resolveDataScope } = await import('@/server/scope');
+  const scope = await resolveDataScope(req, user);
   const id = rest[0];
   if (m === 'GET' && !id) {
-    const r = await messageService.list(user.id, conversationId, queryOf(req, messageListQuerySchema));
+    const r = await messageService.list(scope, conversationId, queryOf(req, messageListQuerySchema));
     return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
   }
   if (m === 'POST' && !id) {
     const body = createMessageSchema.parse(await parseBody(req));
-    return created(await messageService.create(user.id, conversationId, body.role, body.content));
+    return created(await messageService.create(scope, conversationId, body.role, body.content));
   }
   if (id) {
     messageIdParamsSchema.parse({ id, conversationId });
     if (m === 'PATCH') {
       const body = replaceMessageSchema.parse(await parseBody(req));
-      return ok(await messageService.update(user.id, conversationId, id, body));
+      return ok(await messageService.update(scope, conversationId, id, body));
     }
     if (m === 'DELETE') {
-      await messageService.remove(user.id, conversationId, id);
+      await messageService.remove(scope, conversationId, id);
       return noContent();
     }
   }
@@ -615,6 +642,8 @@ async function handleAi(req: Request, m: string, action: string | undefined, use
   }
 
   if (m !== 'POST' || !action) throw new Error('Not found: ai');
+  const { resolveDataScope } = await import('@/server/scope');
+  const scope = await resolveDataScope(req, user);
   const body = await parseBody(req);
   const client = await getAiClient(user.id);
 
@@ -624,7 +653,7 @@ async function handleAi(req: Request, m: string, action: string | undefined, use
       return Response.json({ success: false, error: { code: 'AI_NOT_CONFIGURED', message: 'AI is not configured. Add an API key on the Settings page or set AI_API_KEY in the environment.' } }, { status: 503 });
     }
     return sseResponse(async (write, signal) => {
-      const result = await aiService.draftReply(user.id, { conversationId: body.conversationId as string, extraContext: body.extraContext as string | undefined, tone: body.tone as string | undefined, signal }, (d) => write({ type: 'delta', text: d }));
+      const result = await aiService.draftReply(scope, { conversationId: body.conversationId as string, extraContext: body.extraContext as string | undefined, tone: body.tone as string | undefined, signal }, (d) => write({ type: 'delta', text: d }));
       write({ type: 'done', ...result });
     }, req);
   }
@@ -635,22 +664,22 @@ async function handleAi(req: Request, m: string, action: string | undefined, use
       return Response.json({ success: false, error: { code: 'AI_NOT_CONFIGURED', message: 'AI is not configured. Add an API key on the Settings page or set AI_API_KEY in the environment.' } }, { status: 503 });
     }
     return sseResponse(async (write, signal) => {
-      const result = await aiService.rewrite(user.id, { text: body.text as string, tone: body.tone as string | undefined, instruction: body.instruction as string | undefined, signal }, (d) => write({ type: 'delta', text: d }));
+      const result = await aiService.rewrite(scope, { text: body.text as string, tone: body.tone as string | undefined, instruction: body.instruction as string | undefined, signal }, (d) => write({ type: 'delta', text: d }));
       write({ type: 'done', ...result });
     }, req);
   }
 
   if (action === 'analyze-job') {
     analyzeJobSchema.parse(body);
-    return ok(await aiService.analyzeJob(user.id, body.jobId as string));
+    return ok(await aiService.analyzeJob(scope, body.jobId as string));
   }
   if (action === 'interview-prep') {
     interviewPrepSchema.parse(body);
-    return ok(await aiService.prepareInterview(user.id, body.interviewId as string));
+    return ok(await aiService.prepareInterview(scope, body.interviewId as string));
   }
   if (action === 'summarize') {
     summarizeSchema.parse(body);
-    return ok(await aiService.summarizeConversation(user.id, body.conversationId as string));
+    return ok(await aiService.summarizeConversation(scope, body.conversationId as string));
   }
   throw new Error('Not found: ai');
 }

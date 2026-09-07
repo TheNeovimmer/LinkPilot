@@ -4,6 +4,7 @@ import { parsePagination, pickOrder, pickSort, prismaTakeSkip, buildMeta } from 
 import type { z } from 'zod';
 import type { applicationQuerySchema } from './schema';
 import type { ApplicationDTO, ApplicationPipelineStats } from './types';
+import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, scopeReadWhere, type ScopeInput } from '../../server/scope';
 
 type ListQuery = z.infer<typeof applicationQuerySchema>;
 
@@ -87,10 +88,10 @@ function mapApplication(row: ApplicationRow): ApplicationDTO {
 }
 
 export class ApplicationRepository {
-  async list(userId: string, query: ListQuery) {
+  async list(scopeInput: ScopeInput, query: ListQuery) {
+    const scope = normalizeScope(scopeInput);
     const { page, limit } = parsePagination(query);
-    const where: Prisma.ApplicationWhereInput = {
-      userId,
+    const where: Prisma.ApplicationWhereInput = scopeAndWhere(scope, {
       ...(query.status ? { status: query.status } : {}),
       ...(query.jobId ? { jobId: query.jobId } : {}),
       ...(query.source ? { source: query.source } : {}),
@@ -103,7 +104,7 @@ export class ApplicationRepository {
             ],
           }
         : {}),
-    };
+    });
     const rows = await prisma.application.findMany({
       where,
       orderBy: { [pickSort(query.sortBy, ['createdAt', 'updatedAt', 'appliedAt', 'companyName'], 'updatedAt')]: pickOrder(query.order) },
@@ -114,33 +115,39 @@ export class ApplicationRepository {
     return { items: rows.map(mapApplication), meta: buildMeta({ page, limit }, total) };
   }
 
-  async findById(userId: string, id: string): Promise<ApplicationDTO | null> {
-    const row = await prisma.application.findFirst({ where: { id, userId }, include });
+  async findById(scopeInput: ScopeInput, id: string): Promise<ApplicationDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.application.findFirst({ where: scopeIdWhere(scope, id), include });
     return row ? mapApplication(row) : null;
   }
 
-  async create(userId: string, data: ApplicationInput): Promise<ApplicationDTO> {
-    const row = await prisma.application.create({ data: { userId, ...data }, include });
+  async create(scopeInput: ScopeInput, data: ApplicationInput): Promise<ApplicationDTO> {
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.application.create({ data: { ...scopeCreateData(scope), ...data }, include });
     return mapApplication(row);
   }
 
-  async update(userId: string, id: string, data: Partial<ApplicationInput>): Promise<ApplicationDTO | null> {
-    const result = await prisma.application.updateMany({ where: { id, userId }, data });
+  async update(scopeInput: ScopeInput, id: string, data: Partial<ApplicationInput>): Promise<ApplicationDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.application.updateMany({ where: scopeIdWhere(scope, id), data });
     if (result.count === 0) return null;
-    return this.findById(userId, id);
+    return this.findById(scope, id);
   }
 
-  async remove(userId: string, id: string): Promise<boolean> {
-    const result = await prisma.application.deleteMany({ where: { id, userId } });
+  async remove(scopeInput: ScopeInput, id: string): Promise<boolean> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.application.deleteMany({ where: scopeIdWhere(scope, id) });
     return result.count > 0;
   }
 
-  async pipeline(userId: string): Promise<ApplicationPipelineStats> {
-    const grouped = await prisma.application.groupBy({ by: ['status'], where: { userId }, _count: true });
+  async pipeline(scopeInput: ScopeInput): Promise<ApplicationPipelineStats> {
+    const scope = normalizeScope(scopeInput);
+    const where = scopeReadWhere(scope);
+    const grouped = await prisma.application.groupBy({ by: ['status'], where, _count: true });
     const byStatus = Object.fromEntries(grouped.map((g) => [g.status, g._count])) as Record<ApplicationStatus, number>;
-    const total = await prisma.application.count({ where: { userId } });
+    const total = await prisma.application.count({ where });
     const active = await prisma.application.count({
-      where: { userId, status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'INTERVIEWING'] } },
+      where: { AND: [where, { status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'INTERVIEWING'] } }] },
     });
     return {
       byStatus: {

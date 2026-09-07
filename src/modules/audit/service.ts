@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import type { AuditAction } from './types';
 import { AuditLogRepository } from './repository';
+import type { ScopeInput } from '../../server/scope';
 
 export class AuditService {
   constructor(private readonly repo: AuditLogRepository) {}
@@ -22,8 +23,8 @@ export class AuditService {
     }
   }
 
-  async list(userId: string, query: Parameters<AuditLogRepository['list']>[1]) {
-    return this.repo.list(userId, query);
+  async list(scopeInput: ScopeInput, query: Parameters<AuditLogRepository['list']>[1]) {
+    return this.repo.list(scopeInput, query);
   }
 }
 

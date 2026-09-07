@@ -4,6 +4,7 @@ import { parsePagination, pickOrder, pickSort, prismaTakeSkip, buildMeta } from 
 import type { z } from 'zod';
 import type { companyQuerySchema } from './schema';
 import type { CompanyDTO } from './types';
+import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, type ScopeInput } from '../../server/scope';
 
 type ListQuery = z.infer<typeof companyQuerySchema>;
 
@@ -37,10 +38,10 @@ function mapCompany(row: CompanyRow): CompanyDTO {
 }
 
 export class CompanyRepository {
-  async list(userId: string, query: ListQuery) {
+  async list(scopeInput: ScopeInput, query: ListQuery) {
+    const scope = normalizeScope(scopeInput);
     const { page, limit } = parsePagination(query);
-    const where: Prisma.CompanyWhereInput = {
-      userId,
+    const where: Prisma.CompanyWhereInput = scopeAndWhere(scope, {
       ...(query.industry ? { industry: { contains: query.industry, mode: 'insensitive' } } : {}),
       ...(query.q
         ? {
@@ -50,7 +51,7 @@ export class CompanyRepository {
             ],
           }
         : {}),
-    };
+    });
     const rows = await prisma.company.findMany({
       where,
       orderBy: { [pickSort(query.sortBy, ['createdAt', 'updatedAt', 'name'], 'updatedAt')]: pickOrder(query.order) },
@@ -62,32 +63,37 @@ export class CompanyRepository {
   }
 
   /** Lightweight list (all companies, name + id) for dropdowns. */
-  async all(userId: string): Promise<{ id: string; name: string }[]> {
+  async all(scopeInput: ScopeInput): Promise<{ id: string; name: string }[]> {
+    const scope = normalizeScope(scopeInput);
     return prisma.company.findMany({
-      where: { userId },
+      where: scopeAndWhere(scope),
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
     });
   }
 
-  async findById(userId: string, id: string): Promise<CompanyDTO | null> {
-    const row = await prisma.company.findFirst({ where: { id, userId }, include });
+  async findById(scopeInput: ScopeInput, id: string): Promise<CompanyDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.company.findFirst({ where: scopeIdWhere(scope, id), include });
     return row ? mapCompany(row) : null;
   }
 
-  async create(userId: string, data: { name: string; industry?: string; website?: string; location?: string; notes?: string }): Promise<CompanyDTO> {
-    const row = await prisma.company.create({ data: { userId, ...data }, include });
+  async create(scopeInput: ScopeInput, data: { name: string; industry?: string; website?: string; location?: string; notes?: string }): Promise<CompanyDTO> {
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.company.create({ data: { ...scopeCreateData(scope), ...data }, include });
     return mapCompany(row);
   }
 
-  async update(userId: string, id: string, data: Partial<{ name: string; industry: string; website: string; location: string; notes: string }>): Promise<CompanyDTO | null> {
-    const result = await prisma.company.updateMany({ where: { id, userId }, data });
+  async update(scopeInput: ScopeInput, id: string, data: Partial<{ name: string; industry: string; website: string; location: string; notes: string }>): Promise<CompanyDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.company.updateMany({ where: scopeIdWhere(scope, id), data });
     if (result.count === 0) return null;
-    return this.findById(userId, id);
+    return this.findById(scope, id);
   }
 
-  async remove(userId: string, id: string): Promise<boolean> {
-    const result = await prisma.company.deleteMany({ where: { id, userId } });
+  async remove(scopeInput: ScopeInput, id: string): Promise<boolean> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.company.deleteMany({ where: scopeIdWhere(scope, id) });
     return result.count > 0;
   }
 }

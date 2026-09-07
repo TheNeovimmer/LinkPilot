@@ -1,5 +1,6 @@
 import { prisma } from '../../database/prisma';
 import { mapAttachment, type AttachmentDTO } from './types';
+import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, type ScopeInput } from '../../server/scope';
 
 export interface AttachmentInput {
   applicationId?: string | null;
@@ -13,32 +14,35 @@ export interface AttachmentInput {
 }
 
 export class AttachmentRepository {
-  async create(userId: string, data: AttachmentInput): Promise<AttachmentDTO> {
-    const row = await prisma.attachment.create({ data: { userId, ...data } });
+  async create(scopeInput: ScopeInput, data: AttachmentInput): Promise<AttachmentDTO> {
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.attachment.create({ data: { ...scopeCreateData(scope), ...data } });
     return mapAttachment(row);
   }
 
-  async listFor(userId: string, applicationId?: string | null, noteId?: string | null): Promise<AttachmentDTO[]> {
+  async listFor(scopeInput: ScopeInput, applicationId?: string | null, noteId?: string | null): Promise<AttachmentDTO[]> {
+    const scope = normalizeScope(scopeInput);
     const rows = await prisma.attachment.findMany({
-      where: {
-        userId,
+      where: scopeAndWhere(scope, {
         ...(applicationId ? { applicationId } : {}),
         ...(noteId ? { noteId } : {}),
-      },
+      }),
       orderBy: { createdAt: 'desc' },
     });
     return rows.map(mapAttachment);
   }
 
-  async findById(userId: string, id: string): Promise<AttachmentDTO | null> {
-    const row = await prisma.attachment.findFirst({ where: { id, userId } });
+  async findById(scopeInput: ScopeInput, id: string): Promise<AttachmentDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.attachment.findFirst({ where: scopeIdWhere(scope, id) });
     return row ? mapAttachment(row) : null;
   }
 
-  async remove(userId: string, id: string): Promise<AttachmentDTO | null> {
-    const existing = await this.findById(userId, id);
+  async remove(scopeInput: ScopeInput, id: string): Promise<AttachmentDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const existing = await this.findById(scope, id);
     if (!existing) return null;
-    await prisma.attachment.deleteMany({ where: { id, userId } });
+    await prisma.attachment.deleteMany({ where: scopeIdWhere(scope, id) });
     return existing;
   }
 }

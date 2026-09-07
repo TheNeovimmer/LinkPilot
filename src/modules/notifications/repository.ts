@@ -4,16 +4,17 @@ import { parsePagination, prismaTakeSkip, buildMeta } from '../../utils/paginati
 import type { z } from 'zod';
 import type { notificationQuerySchema } from './schema';
 import type { NotificationDTO, NotificationType } from './types';
+import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, scopeReadWhere, type ScopeInput } from '../../server/scope';
 
 type ListQuery = z.infer<typeof notificationQuerySchema>;
 
 export class NotificationRepository {
-  async list(userId: string, query: ListQuery) {
+  async list(scopeInput: ScopeInput, query: ListQuery) {
+    const scope = normalizeScope(scopeInput);
     const { page, limit } = parsePagination(query);
-    const where: Prisma.NotificationWhereInput = {
-      userId,
+    const where: Prisma.NotificationWhereInput = scopeAndWhere(scope, {
       ...(query.unread !== undefined ? { read: !query.unread } : {}),
-    };
+    });
     const rows = await prisma.notification.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -23,12 +24,14 @@ export class NotificationRepository {
     return { items: rows as NotificationDTO[], meta: buildMeta({ page, limit }, total) };
   }
 
-  async unreadCount(userId: string): Promise<number> {
-    return prisma.notification.count({ where: { userId, read: false } });
+  async unreadCount(scopeInput: ScopeInput): Promise<number> {
+    const scope = normalizeScope(scopeInput);
+    return prisma.notification.count({ where: scopeAndWhere(scope, { read: false }) });
   }
 
   async create(data: {
     userId: string;
+    orgId?: string | null;
     type: NotificationType;
     title: string;
     body?: string;
@@ -37,18 +40,21 @@ export class NotificationRepository {
     return prisma.notification.create({ data }) as Promise<NotificationDTO>;
   }
 
-  async markRead(userId: string, id: string): Promise<boolean> {
-    const result = await prisma.notification.updateMany({ where: { id, userId }, data: { read: true } });
+  async markRead(scopeInput: ScopeInput, id: string): Promise<boolean> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.notification.updateMany({ where: scopeIdWhere(scope, id), data: { read: true } });
     return result.count > 0;
   }
 
-  async markAllRead(userId: string): Promise<number> {
-    const result = await prisma.notification.updateMany({ where: { userId, read: false }, data: { read: true } });
+  async markAllRead(scopeInput: ScopeInput): Promise<number> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.notification.updateMany({ where: scopeAndWhere(scope, { read: false }), data: { read: true } });
     return result.count;
   }
 
-  async remove(userId: string, id: string): Promise<boolean> {
-    const result = await prisma.notification.deleteMany({ where: { id, userId } });
+  async remove(scopeInput: ScopeInput, id: string): Promise<boolean> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.notification.deleteMany({ where: scopeIdWhere(scope, id) });
     return result.count > 0;
   }
 }

@@ -4,6 +4,7 @@ import { parsePagination, pickOrder, pickSort, prismaTakeSkip, buildMeta } from 
 import type { z } from 'zod';
 import type { recruiterQuerySchema } from './schema';
 import type { RecruiterDTO, RecruiterPipelineStats } from './types';
+import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, scopeReadWhere, type ScopeInput } from '../../server/scope';
 
 type ListQuery = z.infer<typeof recruiterQuerySchema>;
 
@@ -49,10 +50,10 @@ function mapRecruiter(row: RecruiterRow): RecruiterDTO {
 }
 
 export class RecruiterRepository {
-  async list(userId: string, query: ListQuery) {
+  async list(scopeInput: ScopeInput, query: ListQuery) {
+    const scope = normalizeScope(scopeInput);
     const { page, limit } = parsePagination(query);
-    const where: Prisma.RecruiterWhereInput = {
-      userId,
+    const where: Prisma.RecruiterWhereInput = scopeAndWhere(scope, {
       ...(query.status ? { status: query.status } : {}),
       ...(query.companyId ? { companyId: query.companyId } : {}),
       ...(query.q
@@ -64,7 +65,7 @@ export class RecruiterRepository {
             ],
           }
         : {}),
-    };
+    });
     const rows = await prisma.recruiter.findMany({
       where,
       orderBy: { [pickSort(query.sortBy, ['createdAt', 'updatedAt', 'name', 'lastContactAt'], 'updatedAt')]: pickOrder(query.order) },
@@ -75,33 +76,39 @@ export class RecruiterRepository {
     return { items: rows.map(mapRecruiter), meta: buildMeta({ page, limit }, total) };
   }
 
-  async findById(userId: string, id: string): Promise<RecruiterDTO | null> {
-    const row = await prisma.recruiter.findFirst({ where: { id, userId }, include });
+  async findById(scopeInput: ScopeInput, id: string): Promise<RecruiterDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.recruiter.findFirst({ where: scopeIdWhere(scope, id), include });
     return row ? mapRecruiter(row) : null;
   }
 
-  async create(userId: string, data: { name: string; companyId?: string; title?: string; linkedinUrl?: string; email?: string; phone?: string; notes?: string; status?: RecruiterStatus; lastContactAt?: Date | null }): Promise<RecruiterDTO> {
-    const row = await prisma.recruiter.create({ data: { userId, ...data }, include });
+  async create(scopeInput: ScopeInput, data: { name: string; companyId?: string; title?: string; linkedinUrl?: string; email?: string; phone?: string; notes?: string; status?: RecruiterStatus; lastContactAt?: Date | null }): Promise<RecruiterDTO> {
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.recruiter.create({ data: { ...scopeCreateData(scope), ...data }, include });
     return mapRecruiter(row);
   }
 
-  async update(userId: string, id: string, data: Partial<{ name: string; companyId: string | null; title: string; linkedinUrl: string; email: string; phone: string; notes: string; status: RecruiterStatus; lastContactAt: Date | null }>): Promise<RecruiterDTO | null> {
-    const result = await prisma.recruiter.updateMany({ where: { id, userId }, data });
+  async update(scopeInput: ScopeInput, id: string, data: Partial<{ name: string; companyId: string | null; title: string; linkedinUrl: string; email: string; phone: string; notes: string; status: RecruiterStatus; lastContactAt: Date | null }>): Promise<RecruiterDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.recruiter.updateMany({ where: scopeIdWhere(scope, id), data });
     if (result.count === 0) return null;
-    return this.findById(userId, id);
+    return this.findById(scope, id);
   }
 
-  async remove(userId: string, id: string): Promise<boolean> {
-    const result = await prisma.recruiter.deleteMany({ where: { id, userId } });
+  async remove(scopeInput: ScopeInput, id: string): Promise<boolean> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.recruiter.deleteMany({ where: scopeIdWhere(scope, id) });
     return result.count > 0;
   }
 
-  async pipeline(userId: string): Promise<RecruiterPipelineStats> {
-    const grouped = await prisma.recruiter.groupBy({ by: ['status'], where: { userId }, _count: true });
+  async pipeline(scopeInput: ScopeInput): Promise<RecruiterPipelineStats> {
+    const scope = normalizeScope(scopeInput);
+    const where = scopeReadWhere(scope);
+    const grouped = await prisma.recruiter.groupBy({ by: ['status'], where, _count: true });
     const byStatus = Object.fromEntries(grouped.map((g) => [g.status, g._count])) as Record<RecruiterStatus, number>;
-    const total = await prisma.recruiter.count({ where: { userId } });
+    const total = await prisma.recruiter.count({ where });
     const contactable = await prisma.recruiter.count({
-      where: { userId, email: { not: null } },
+      where: { AND: [where, { email: { not: null } }] },
     });
     return {
       byStatus: {

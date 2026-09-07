@@ -5,6 +5,7 @@ import type { z } from 'zod';
 import type { interviewQuerySchema } from './schema';
 import type { InterviewPrep } from '../../prompts/interviewPrep';
 import type { InterviewDTO } from './types';
+import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, scopeReadWhere, type ScopeInput } from '../../server/scope';
 
 type ListQuery = z.infer<typeof interviewQuerySchema>;
 
@@ -55,10 +56,10 @@ function mapInterview(row: InterviewRow): InterviewDTO {
 }
 
 export class InterviewRepository {
-  async list(userId: string, query: ListQuery) {
+  async list(scopeInput: ScopeInput, query: ListQuery) {
+    const scope = normalizeScope(scopeInput);
     const { page, limit } = parsePagination(query);
-    const where: Prisma.InterviewWhereInput = {
-      userId,
+    const where: Prisma.InterviewWhereInput = scopeAndWhere(scope, {
       ...(query.status ? { status: query.status } : {}),
       ...(query.mode ? { mode: query.mode } : {}),
       ...(query.jobId ? { jobId: query.jobId } : {}),
@@ -70,7 +71,7 @@ export class InterviewRepository {
             },
           }
         : {}),
-    };
+    });
     const rows = await prisma.interview.findMany({
       where,
       orderBy: { [pickSort(query.sortBy, ['scheduledAt', 'createdAt', 'updatedAt'], 'scheduledAt')]: pickOrder(query.order, 'asc') },
@@ -82,13 +83,13 @@ export class InterviewRepository {
   }
 
   /** Upcoming scheduled interviews. */
-  async upcoming(userId: string, windowDays = 14): Promise<InterviewDTO[]> {
+  async upcoming(scopeInput: ScopeInput, windowDays = 14): Promise<InterviewDTO[]> {
+    const scope = normalizeScope(scopeInput);
     const rows = await prisma.interview.findMany({
-      where: {
-        userId,
+      where: scopeAndWhere(scope, {
         status: 'SCHEDULED',
         scheduledAt: { gte: new Date(), lte: new Date(Date.now() + windowDays * 86_400_000) },
-      },
+      }),
       orderBy: { scheduledAt: 'asc' },
       take: 20,
       include,
@@ -96,15 +97,17 @@ export class InterviewRepository {
     return rows.map(mapInterview);
   }
 
-  async findById(userId: string, id: string): Promise<InterviewDTO | null> {
-    const row = await prisma.interview.findFirst({ where: { id, userId }, include });
+  async findById(scopeInput: ScopeInput, id: string): Promise<InterviewDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.interview.findFirst({ where: scopeIdWhere(scope, id), include });
     return row ? mapInterview(row) : null;
   }
 
   /** Slim view consumed by the AI service (prep generation). */
-  async findAiView(userId: string, id: string) {
+  async findAiView(scopeInput: ScopeInput, id: string) {
+    const scope = normalizeScope(scopeInput);
     const row = await prisma.interview.findFirst({
-      where: { id, userId },
+      where: scopeIdWhere(scope, id),
       select: {
         id: true,
         title: true,
@@ -118,7 +121,7 @@ export class InterviewRepository {
   }
 
   async create(
-    userId: string,
+    scopeInput: ScopeInput,
     data: {
       title: string;
       scheduledAt: Date;
@@ -132,12 +135,13 @@ export class InterviewRepository {
       feedback?: string | null;
     },
   ): Promise<InterviewDTO> {
-    const row = await prisma.interview.create({ data: { userId, ...data }, include });
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.interview.create({ data: { ...scopeCreateData(scope), ...data }, include });
     return mapInterview(row);
   }
 
   async update(
-    userId: string,
+    scopeInput: ScopeInput,
     id: string,
     data: Partial<{
       title: string;
@@ -152,19 +156,22 @@ export class InterviewRepository {
       feedback: string | null;
     }>,
   ): Promise<InterviewDTO | null> {
-    const result = await prisma.interview.updateMany({ where: { id, userId }, data });
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.interview.updateMany({ where: scopeIdWhere(scope, id), data });
     if (result.count === 0) return null;
-    return this.findById(userId, id);
+    return this.findById(scope, id);
   }
 
-  async remove(userId: string, id: string): Promise<boolean> {
-    const result = await prisma.interview.deleteMany({ where: { id, userId } });
+  async remove(scopeInput: ScopeInput, id: string): Promise<boolean> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.interview.deleteMany({ where: scopeIdWhere(scope, id) });
     return result.count > 0;
   }
 
-  async updatePrep(userId: string, id: string, prep: InterviewPrep): Promise<void> {
+  async updatePrep(scopeInput: ScopeInput, id: string, prep: InterviewPrep): Promise<void> {
+    const scope = normalizeScope(scopeInput);
     await prisma.interview.updateMany({
-      where: { id, userId },
+      where: scopeIdWhere(scope, id),
       data: { prep: prep as unknown as Prisma.InputJsonValue },
     });
   }

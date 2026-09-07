@@ -4,6 +4,7 @@ import { parsePagination, pickOrder, pickSort, prismaTakeSkip } from '../../util
 import type { ConversationDTO, ConversationListResult } from './types';
 import type { z } from 'zod';
 import type { conversationQuerySchema } from './schema';
+import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, type ScopeInput } from '../../server/scope';
 
 type ListQuery = z.infer<typeof conversationQuerySchema>;
 
@@ -42,10 +43,10 @@ function toDTO(row: {
 }
 
 export class ConversationRepository {
-  async list(userId: string, query: ListQuery): Promise<{ items: ConversationDTO[]; total: number }> {
+  async list(scopeInput: ScopeInput, query: ListQuery): Promise<{ items: ConversationDTO[]; total: number }> {
+    const scope = normalizeScope(scopeInput);
     const { page, limit } = parsePagination(query);
-    const where: Prisma.ConversationWhereInput = {
-      userId,
+    const where: Prisma.ConversationWhereInput = scopeAndWhere(scope, {
       ...(query.status ? { status: query.status } : {}),
       ...(query.recruiterId ? { recruiterId: query.recruiterId } : {}),
       ...(query.companyId ? { companyId: query.companyId } : {}),
@@ -59,7 +60,7 @@ export class ConversationRepository {
             ],
           }
         : {}),
-    };
+    });
 
     const orderBy: Prisma.ConversationOrderByWithRelationInput = {
       [pickSort(query.sortBy, ['updatedAt', 'createdAt', 'lastMessageAt', 'contactName'], 'updatedAt')]:
@@ -83,9 +84,10 @@ export class ConversationRepository {
     return { items: rows.map(toDTO), total };
   }
 
-  async findById(userId: string, id: string): Promise<ConversationDTO | null> {
+  async findById(scopeInput: ScopeInput, id: string): Promise<ConversationDTO | null> {
+    const scope = normalizeScope(scopeInput);
     const row = await prisma.conversation.findFirst({
-      where: { id, userId },
+      where: scopeIdWhere(scope, id),
       include: {
         _count: { select: { messages: true } },
         company: { select: { name: true } },
@@ -96,7 +98,7 @@ export class ConversationRepository {
   }
 
   async create(
-    userId: string,
+    scopeInput: ScopeInput,
     data: {
       contactName: string;
       contactLinkedInUrl?: string;
@@ -107,8 +109,9 @@ export class ConversationRepository {
       pinned?: boolean;
     },
   ): Promise<ConversationDTO> {
+    const scope = normalizeScope(scopeInput);
     const row = await prisma.conversation.create({
-      data: { userId, ...data },
+      data: { ...scopeCreateData(scope), ...data },
       include: {
         _count: { select: { messages: true } },
         company: { select: { name: true } },
@@ -119,7 +122,7 @@ export class ConversationRepository {
   }
 
   async update(
-    userId: string,
+    scopeInput: ScopeInput,
     id: string,
     data: Partial<{
       contactName: string;
@@ -131,13 +134,15 @@ export class ConversationRepository {
       pinned: boolean;
     }>,
   ): Promise<ConversationDTO | null> {
-    const row = await prisma.conversation.updateMany({ where: { id, userId }, data });
+    const scope = normalizeScope(scopeInput);
+    const row = await prisma.conversation.updateMany({ where: scopeIdWhere(scope, id), data });
     if (row.count === 0) return null;
-    return this.findById(userId, id);
+    return this.findById(scope, id);
   }
 
-  async remove(userId: string, id: string): Promise<boolean> {
-    const result = await prisma.conversation.deleteMany({ where: { id, userId } });
+  async remove(scopeInput: ScopeInput, id: string): Promise<boolean> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.conversation.deleteMany({ where: scopeIdWhere(scope, id) });
     return result.count > 0;
   }
 

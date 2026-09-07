@@ -2,40 +2,44 @@ import { ApiError } from '../../utils/ApiError';
 import { auditService } from '../audit/service';
 import type { NoteDTO } from './types';
 import { NoteRepository } from './repository';
+import { normalizeScope, type ScopeInput } from '../../server/scope';
 
 export class NoteService {
   constructor(private readonly repo: NoteRepository) {}
 
-  async list(userId: string, query: Parameters<NoteRepository['list']>[1]) {
-    return this.repo.list(userId, query);
+  async list(scopeInput: ScopeInput, query: Parameters<NoteRepository['list']>[1]) {
+    return this.repo.list(scopeInput, query);
   }
 
-  async get(userId: string, id: string): Promise<NoteDTO> {
-    const note = await this.repo.findById(userId, id);
+  async get(scopeInput: ScopeInput, id: string): Promise<NoteDTO> {
+    const note = await this.repo.findById(scopeInput, id);
     if (!note) throw ApiError.notFound('Note not found');
     return note;
   }
 
-  async create(userId: string, data: Parameters<NoteRepository['create']>[1]): Promise<NoteDTO> {
-    const note = await this.repo.create(userId, data);
-    await auditService.log(userId, 'note.create', 'note', note.id, { title: note.title });
+  async create(scopeInput: ScopeInput, data: Parameters<NoteRepository['create']>[1]): Promise<NoteDTO> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    const note = await this.repo.create(scopeInput, data);
+    await auditService.log(userId, 'note.create', 'note', note.id, { title: note.title }, undefined, orgId || undefined);
     return note;
   }
 
-  async update(userId: string, id: string, data: Parameters<NoteRepository['update']>[2]): Promise<NoteDTO> {
-    await this.get(userId, id);
-    const updated = await this.repo.update(userId, id, data);
-    await auditService.log(userId, 'note.update', 'note', id);
+  async update(scopeInput: ScopeInput, id: string, data: Parameters<NoteRepository['update']>[2]): Promise<NoteDTO> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    await this.get(scopeInput, id);
+    const updated = await this.repo.update(scopeInput, id, data);
+    await auditService.log(userId, 'note.update', 'note', id, undefined, undefined, orgId || undefined);
     return updated!;
   }
 
-  async remove(userId: string, id: string): Promise<void> {
-    await this.get(userId, id);
-    await this.repo.remove(userId, id);
-    await auditService.log(userId, 'note.delete', 'note', id);
+  async remove(scopeInput: ScopeInput, id: string): Promise<void> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    await this.get(scopeInput, id);
+    await this.repo.remove(scopeInput, id);
+    await auditService.log(userId, 'note.delete', 'note', id, undefined, undefined, orgId || undefined);
   }
 
-  async tags(userId: string) {
-    return this.repo.tags(userId);
+  async tags(scopeInput: ScopeInput) {
+    return this.repo.tags(scopeInput);
   }
 }
