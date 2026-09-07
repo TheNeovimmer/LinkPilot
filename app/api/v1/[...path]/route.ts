@@ -589,23 +589,25 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
 // ---- messages (nested under conversations) ---------------------------------
 
 async function handleMessages(req: Request, m: string, rest: string[], user: AuthUser, conversationId: string): Promise<Response> {
+  const { resolveDataScope } = await import('@/server/scope');
+  const scope = await resolveDataScope(req, user);
   const id = rest[0];
   if (m === 'GET' && !id) {
-    const r = await messageService.list(user.id, conversationId, queryOf(req, messageListQuerySchema));
+    const r = await messageService.list(scope, conversationId, queryOf(req, messageListQuerySchema));
     return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
   }
   if (m === 'POST' && !id) {
     const body = createMessageSchema.parse(await parseBody(req));
-    return created(await messageService.create(user.id, conversationId, body.role, body.content));
+    return created(await messageService.create(scope, conversationId, body.role, body.content));
   }
   if (id) {
     messageIdParamsSchema.parse({ id, conversationId });
     if (m === 'PATCH') {
       const body = replaceMessageSchema.parse(await parseBody(req));
-      return ok(await messageService.update(user.id, conversationId, id, body));
+      return ok(await messageService.update(scope, conversationId, id, body));
     }
     if (m === 'DELETE') {
-      await messageService.remove(user.id, conversationId, id);
+      await messageService.remove(scope, conversationId, id);
       return noContent();
     }
   }
