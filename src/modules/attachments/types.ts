@@ -1,5 +1,3 @@
-import type { Attachment } from '@prisma/client';
-
 export interface AttachmentDTO {
   id: string;
   applicationId: string | null;
@@ -19,7 +17,20 @@ export function isAttachmentKind(v: unknown): v is AttachmentKind {
   return typeof v === 'string' && (ATTACHMENT_KINDS as readonly string[]).includes(v);
 }
 
-export function mapAttachment(a: Attachment): AttachmentDTO {
+/** Row shape for mapping. Deliberately excludes the `data` bytes column. */
+type AttachmentRow = {
+  id: string;
+  applicationId: string | null;
+  noteId: string | null;
+  kind: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  createdAt: Date;
+};
+
+export function mapAttachment(a: AttachmentRow): AttachmentDTO {
   return {
     id: a.id,
     applicationId: a.applicationId,
