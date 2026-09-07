@@ -458,23 +458,25 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
       throw new Error('Not found: jobs');
     }
     case 'applications': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'pipeline') return ok(await applicationService.pipeline(user.id));
+      if (m === 'GET' && id === 'pipeline') return ok(await applicationService.pipeline(scope));
       if (m === 'PATCH' && id === 'bulk') {
         const body = bulkApplicationSchema.parse(await parseBody(req));
-        return ok({ updated: await applicationService.bulkUpdate(user.id, body.ids, body.status) });
+        return ok({ updated: await applicationService.bulkUpdate(scope, body.ids, body.status) });
       }
       if (m === 'GET' && !id) {
-        const r = await applicationService.list(user.id, queryOf(req, applicationQuerySchema));
+        const r = await applicationService.list(scope, queryOf(req, applicationQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof applicationService.create>[1]>(createApplicationSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await applicationService.create(scope, asServiceInput<Parameters<typeof applicationService.create>[1]>(createApplicationSchema.parse(await parseBody(req)))));
       if (id) {
         applicationIdSchema.parse({ id });
-        if (m === 'GET') return ok(await applicationService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof applicationService.update>[2]>(updateApplicationSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await applicationService.get(scope, id));
+        if (m === 'PATCH') return ok(await applicationService.update(scope, id, asServiceInput<Parameters<typeof applicationService.update>[2]>(updateApplicationSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await applicationService.remove(user.id, id);
+          await applicationService.remove(scope, id);
           return noContent();
         }
       }
