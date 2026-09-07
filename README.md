@@ -112,6 +112,28 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Workspaces and roles (RBAC)
+
+LinkPilot is a multi-workspace SaaS. Every account gets a personal workspace on first login; teams collaborate via email-bound invites from **Workspaces**.
+
+| Role | Read | Write + AI | Invite | Manage members | Manage workspace |
+|---|---|---|---|---|---|
+| VIEWER | yes | no | no | no | no |
+| MEMBER | yes | yes | no | no | no |
+| ADMIN | yes | yes | yes | yes | no |
+| OWNER | yes | yes | yes | yes | yes |
+
+Only OWNERs may grant, demote, or remove other OWNERs, and the last OWNER cannot be demoted or removed. Platform administration (`/admin`, all workspaces and users) requires `SUPER_ADMIN`, enforced server-side:
+
+```bash
+npx tsx scripts/promote-admin.ts --list
+npx tsx scripts/promote-admin.ts you@company.com
+```
+
+Invite links look like `/workspaces?token=...` and auto-accept on open when signed in with the invited email. Invite emails are not sent yet — copy the link from the UI.
+
+> Phase 2 scope: workspace-shared domain rows (today rows are still per-user), invite email delivery, cached memberships.
+
 > **Production deployments**: the PWA service worker only activates in production builds (`npm run build && npm run start`), and the `UPLOAD_DIR` must point at a persistent volume so avatars and attachments survive restarts.
 
 ---
@@ -125,6 +147,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run start` | Start production server |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript type checking |
+| `npm test` | Unit tests (node:test via tsx, zero new deps) |
 | `npm run db:generate` | Regenerate Prisma client |
 | `npm run db:migrate` | Run Prisma migrations (dev) |
 | `npm run db:deploy` | Deploy migrations (production) |
