@@ -51,8 +51,11 @@ export class ProfileRepository {
     return this.findById(userId);
   }
 
-  async updateImage(userId: string, imageUrl: string): Promise<ProfileDTO | null> {
-    await prisma.user.update({ where: { id: userId }, data: { image: imageUrl } });
+  async updateImage(userId: string, imageUrl: string, avatar?: { data: Buffer; mime: string }): Promise<ProfileDTO | null> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { image: imageUrl, ...(avatar ? { avatarData: avatar.data, avatarMime: avatar.mime } : {}) },
+    });
     return this.findById(userId);
   }
 
