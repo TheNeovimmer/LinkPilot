@@ -150,19 +150,35 @@ export class JobRepository {
   /** pgvector semantic search; falls back to caller if vector ops unavailable. */
   async semanticSearch(scopeInput: ScopeInput, embedding: number[], limit: number): Promise<JobDTO[]> {
     const scope = normalizeScope(scopeInput);
-    const rows = await prisma.$queryRawUnsafe<JobRow[]>(
-      `SELECT j.*, c.name AS "companyName",
+    const vector = `[${embedding.join(',')}]`;
+    // Two explicit shapes instead of a sentinel: personal scope sees legacy
+    // rows only, workspace scope sees org rows plus the caller's legacy rows.
+    const rows = scope.orgId
+      ? await prisma.$queryRawUnsafe<JobRow[]>(
+          `SELECT j.*, c.name AS "companyName",
               (SELECT count(*)::int FROM "Application" a WHERE a."jobId" = j.id) AS "applicationCount",
               (SELECT count(*)::int FROM "Interview" i WHERE i."jobId" = j.id) AS "interviewCount"
        FROM "Job" j LEFT JOIN "Company" c ON c.id = j."companyId"
        WHERE (j."orgId" = $1 OR (j."orgId" IS NULL AND j."userId" = $2)) AND j.embedding IS NOT NULL
        ORDER BY j.embedding <-> $3::vector
        LIMIT $4`,
-      scope.orgId || '__none__',
-      scope.userId,
-      `[${embedding.join(',')}]`,
-      limit,
-    );
+          scope.orgId,
+          scope.userId,
+          vector,
+          limit,
+        )
+      : await prisma.$queryRawUnsafe<JobRow[]>(
+          `SELECT j.*, c.name AS "companyName",
+              (SELECT count(*)::int FROM "Application" a WHERE a."jobId" = j.id) AS "applicationCount",
+              (SELECT count(*)::int FROM "Interview" i WHERE i."jobId" = j.id) AS "interviewCount"
+       FROM "Job" j LEFT JOIN "Company" c ON c.id = j."companyId"
+       WHERE j."orgId" IS NULL AND j."userId" = $1 AND j.embedding IS NOT NULL
+       ORDER BY j.embedding <-> $2::vector
+       LIMIT $3`,
+          scope.userId,
+          vector,
+          limit,
+        );
     return rows.map(mapJob);
   }
 
