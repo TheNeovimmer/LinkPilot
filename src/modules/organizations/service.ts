@@ -2,6 +2,13 @@ import { prisma } from '../../database/prisma';
 import { ApiError } from '../../utils/ApiError';
 import { auditService } from '../audit/service';
 import { atLeast, can, normalizeRole, type OrgRole } from '../rbac/roles';
+import { checkInvite, checkRemove, checkRoleChange } from './policy';
+
+function toApiError(code: string): ApiError {
+  if (code === 'forbidden_owner_only') return ApiError.forbidden('Only owners can manage owners');
+  if (code === 'last_owner') return ApiError.badRequest('Cannot demote or remove the last owner');
+  return ApiError.forbidden('Insufficient role');
+}
 
 function slugify(name: string, userId: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'workspace';
@@ -91,11 +98,9 @@ export class OrganizationService {
     const target = await this.membershipOf(targetUserId, orgId);
     if (!target) throw ApiError.notFound('Member not found');
     const next = normalizeRole(role);
-    if (next === 'OWNER' && (actor.role as OrgRole) !== 'OWNER') throw ApiError.forbidden('Only owners can grant OWNER');
-    if ((target.role as OrgRole) === 'OWNER' && next !== 'OWNER') {
-      const owners = await prisma.membership.count({ where: { orgId, role: 'OWNER', NOT: { userId: targetUserId } } });
-      if (owners === 0) throw ApiError.badRequest('Cannot demote the last owner');
-    }
+    const owners = await prisma.membership.count({ where: { orgId, role: 'OWNER', NOT: { userId: targetUserId } } });
+    const err = checkRoleChange({ actor: actor.role as OrgRole, targetCurrent: target.role as OrgRole, targetNext: next, otherOwners: owners });
+    if (err) throw toApiError(err);
     await prisma.membership.update({ where: { orgId_userId: { orgId, userId: targetUserId } }, data: { role: next } });
     await auditService.log(actorId, 'org.member.role', 'membership', targetUserId, { orgId, role: next });
     return { ok: true };
@@ -109,21 +114,22 @@ export class OrganizationService {
     }
     const target = await this.membershipOf(targetUserId, orgId);
     if (!target) throw ApiError.notFound('Member not found');
-    if ((target.role as OrgRole) === 'OWNER') {
-      const owners = await prisma.membership.count({ where: { orgId, role: 'OWNER', NOT: { userId: targetUserId } } });
-      if (owners === 0) throw ApiError.badRequest('Cannot remove the last owner');
-    }
+    const owners = await prisma.membership.count({ where: { orgId, role: 'OWNER', NOT: { userId: targetUserId } } });
+    const err = checkRemove({ actor: (await this.membershipOf(actorId, orgId))?.role as OrgRole, isSelf: actorId === targetUserId, targetCurrent: target.role as OrgRole, otherOwners: owners });
+    if (err) throw toApiError(err);
     await prisma.membership.delete({ where: { orgId_userId: { orgId, userId: targetUserId } } });
     await auditService.log(actorId, 'org.member.remove', 'membership', targetUserId, { orgId });
     return { ok: true };
   }
 
   async invite(actorId: string, orgId: string, email: string, role: OrgRole) {
-    await this.requireRole(actorId, orgId, 'ADMIN');
+    const actor = await this.requireRole(actorId, orgId, 'ADMIN');
     const next = normalizeRole(role);
-    const actor = await this.membershipOf(actorId, orgId);
-    if (next === 'OWNER' && (actor?.role as OrgRole) !== 'OWNER') throw ApiError.forbidden('Only owners can invite OWNERS');
+    const err = checkInvite(actor.role as OrgRole, next);
+    if (err) throw toApiError(err);
     const clean = email.trim().toLowerCase();
+    const existing = await prisma.user.findUnique({ where: { email: clean }, select: { id: true } });
+    if (existing && await this.membershipOf(existing.id, orgId)) throw ApiError.conflict('Already a member');
     await prisma.orgInvitation.deleteMany({ where: { orgId, email: clean, status: 'PENDING' } });
     const invite = await prisma.orgInvitation.create({
       data: { orgId, email: clean, role: next, status: 'PENDING', invitedBy: actorId, expiresAt: new Date(Date.now() + 7 * 86400000) },
@@ -134,7 +140,7 @@ export class OrganizationService {
 
   async listInvites(userId: string, orgId: string) {
     await this.requireRole(userId, orgId, 'ADMIN');
-    return prisma.orgInvitation.findMany({ where: { orgId, status: 'PENDING' }, orderBy: { createdAt: 'desc' } });
+    return prisma.orgInvitation.findMany({ where: { orgId, status: 'PENDING', expiresAt: { gt: new Date() } }, orderBy: { createdAt: 'desc' } });
   }
 
   async revokeInvite(actorId: string, orgId: string, inviteId: string) {
