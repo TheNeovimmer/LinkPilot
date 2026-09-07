@@ -574,11 +574,16 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
       }
       throw new Error('Not found: notifications');
     }
-    case 'dashboard':
-      if (m === 'GET' && rest[0] === 'stats') return ok(await dashboardService.stats(user.id));
+    case 'dashboard': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
+      if (m === 'GET' && rest[0] === 'stats') return ok(await dashboardService.stats(scope));
       throw new Error('Not found: dashboard');
+    }
     case 'audit-logs': {
-      const r = await auditService.list(user.id, queryOf(req, auditQuerySchema));
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
+      const r = await auditService.list(scope, queryOf(req, auditQuerySchema));
       return ok((r as unknown as { items: unknown }).items, (r as unknown as { meta: unknown }).meta as never);
     }
     case 'ai':
