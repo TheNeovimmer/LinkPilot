@@ -54,6 +54,16 @@ export async function requireOrg(req: Request, user: AuthUser, min?: import('../
   return { orgId, role };
 }
 
+/** Read gate (VIEWER and up). */
+export async function requireOrgRead(req: Request, user: AuthUser): Promise<OrgContext> {
+  return requireOrg(req, user, 'VIEWER');
+}
+
+/** Write gate (MEMBER and up). */
+export async function requireOrgWrite(req: Request, user: AuthUser): Promise<OrgContext> {
+  return requireOrg(req, user, 'MEMBER');
+}
+
 /** Platform owner check (SUPER_ADMIN). */
 export async function requireSuperAdmin(user: AuthUser): Promise<void> {
   const { prisma } = await import('../database/prisma');
