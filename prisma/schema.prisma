@@ -118,6 +118,8 @@ enum ConversationStatus {
 model Conversation {
   id                 String             @id @default(cuid())
   userId             String
+  /// Workspace scope; null = pre-RBAC personal row.
+  orgId              String?
   contactName        String
   contactLinkedInUrl String?
   contactHeadline    String?
@@ -134,6 +136,7 @@ model Conversation {
 
   @@index([userId, status])
   @@index([userId, lastMessageAt])
+  @@index([orgId])
 }
 
 enum MessageRole {
@@ -166,6 +169,8 @@ enum RecruiterStatus {
 model Recruiter {
   id            String          @id @default(cuid())
   userId        String
+  /// Workspace scope; null = pre-RBAC personal row.
+  orgId         String?
   name          String
   companyId     String?
   company       Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
@@ -182,11 +187,14 @@ model Recruiter {
   interviews    Interview[]
 
   @@index([userId, status])
+  @@index([orgId])
 }
 
 model Company {
   id            String         @id @default(cuid())
   userId        String
+  /// Workspace scope; null = pre-RBAC personal row.
+  orgId         String?
   name          String
   industry      String?
   website       String?
@@ -199,6 +207,7 @@ model Company {
   jobs          Job[]
 
   @@index([userId])
+  @@index([orgId])
 }
 
 enum JobStatus {
@@ -213,6 +222,8 @@ enum JobStatus {
 model Job {
   id           String                       @id @default(cuid())
   userId       String
+  /// Workspace scope; null = pre-RBAC personal row.
+  orgId        String?
   companyId    String?
   company      Company?                     @relation(fields: [companyId], references: [id], onDelete: SetNull)
   title        String
@@ -236,6 +247,7 @@ model Job {
   interviews   Interview[]
 
   @@index([userId, status])
+  @@index([orgId])
 }
 
 enum ApplicationStatus {
@@ -264,6 +276,8 @@ enum ApplicationOfferStatus {
 model Application {
   id              String                    @id @default(cuid())
   userId          String
+  /// Workspace scope; null = pre-RBAC personal row.
+  orgId           String?
   jobId           String?
   job             Job?                      @relation(fields: [jobId], references: [id], onDelete: SetNull)
   /// Free-text fields so an application can exist without a tracked job.
@@ -290,6 +304,7 @@ model Application {
 
   @@index([userId, status])
   @@index([userId, appliedAt])
+  @@index([orgId])
 }
 
 enum InterviewMode {
@@ -309,6 +324,8 @@ enum InterviewStatus {
 model Interview {
   id            String          @id @default(cuid())
   userId        String
+  /// Workspace scope; null = pre-RBAC personal row.
+  orgId         String?
   jobId         String?
   job           Job?            @relation(fields: [jobId], references: [id], onDelete: SetNull)
   applicationId String?
@@ -331,11 +348,14 @@ model Interview {
 
   @@index([userId, scheduledAt])
   @@index([userId, status])
+  @@index([orgId])
 }
 
 model Note {
   id          String       @id @default(cuid())
   userId      String
+  /// Workspace scope; null = pre-RBAC personal row.
+  orgId       String?
   title       String
   content     String?
   pinned      Boolean      @default(false)
@@ -345,11 +365,14 @@ model Note {
   attachments Attachment[]
 
   @@index([userId, pinned])
+  @@index([orgId])
 }
 
 model Attachment {
   id            String       @id @default(cuid())
   userId        String
+  /// Workspace scope; null = pre-RBAC personal row.
+  orgId         String?
   applicationId String?
   application   Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   noteId        String?
@@ -366,11 +389,14 @@ model Attachment {
   @@index([userId])
   @@index([applicationId])
   @@index([noteId])
+  @@index([orgId])
 }
 
 model Reminder {
   id         String    @id @default(cuid())
   userId     String
+  /// Workspace scope; null = pre-RBAC personal row.
+  orgId      String?
   title      String
   body       String?
   dueAt      DateTime
@@ -381,11 +407,14 @@ model Reminder {
 
   @@index([userId, dueAt])
   @@index([userId, done])
+  @@index([orgId])
 }
 
 model Notification {
   id        String   @id @default(cuid())
   userId    String
+  /// Workspace scope; null = pre-RBAC personal row.
+  orgId     String?
   /// REMINDER | INTERVIEW | AI | SYSTEM
   type      String
   title     String
@@ -395,6 +424,7 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, read, createdAt])
+  @@index([orgId])
 }
 
 model AuditLog {
