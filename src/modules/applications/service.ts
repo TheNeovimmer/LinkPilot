@@ -51,7 +51,6 @@ export class ApplicationService {
 
   /** Keep the linked job's status in sync and notify on milestones. */
   private async applyStatusSideEffects(scopeInput: ScopeInput, application: ApplicationDTO): Promise<void> {
-    const { userId, orgId } = normalizeScope(scopeInput);
     const scope = normalizeScope(scopeInput);
     const jobStatus = STATUS_TO_JOB[application.status];
     if (jobStatus && application.jobId) {
@@ -59,9 +58,7 @@ export class ApplicationService {
     }
     const milestone = MILESTONES[application.status];
     if (milestone) {
-      await notificationService.create({
-        userId,
-        orgId: orgId || null,
+      await notificationService.createForMembers(scopeInput, {
         type: 'APPLICATION',
         title: milestone.title,
         body: application.jobTitle ?? application.roleTitle ?? application.companyName ?? undefined,
