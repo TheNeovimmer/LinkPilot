@@ -2,36 +2,40 @@ import { ApiError } from '../../utils/ApiError';
 import { auditService } from '../audit/service';
 import type { ReminderDTO } from './types';
 import { ReminderRepository } from './repository';
+import { normalizeScope, type ScopeInput } from '../../server/scope';
 
 export class ReminderService {
   constructor(private readonly repo: ReminderRepository) {}
 
-  async list(userId: string, query: Parameters<ReminderRepository['list']>[1]) {
-    return this.repo.list(userId, query);
+  async list(scopeInput: ScopeInput, query: Parameters<ReminderRepository['list']>[1]) {
+    return this.repo.list(scopeInput, query);
   }
 
-  async get(userId: string, id: string): Promise<ReminderDTO> {
-    const reminder = await this.repo.findById(userId, id);
+  async get(scopeInput: ScopeInput, id: string): Promise<ReminderDTO> {
+    const reminder = await this.repo.findById(scopeInput, id);
     if (!reminder) throw ApiError.notFound('Reminder not found');
     return reminder;
   }
 
-  async create(userId: string, data: Parameters<ReminderRepository['create']>[1]): Promise<ReminderDTO> {
-    const reminder = await this.repo.create(userId, data);
-    await auditService.log(userId, 'reminder.create', 'reminder', reminder.id, { title: reminder.title });
+  async create(scopeInput: ScopeInput, data: Parameters<ReminderRepository['create']>[1]): Promise<ReminderDTO> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    const reminder = await this.repo.create(scopeInput, data);
+    await auditService.log(userId, 'reminder.create', 'reminder', reminder.id, { title: reminder.title }, undefined, orgId || undefined);
     return reminder;
   }
 
-  async update(userId: string, id: string, data: Parameters<ReminderRepository['update']>[2]): Promise<ReminderDTO> {
-    await this.get(userId, id);
-    const updated = await this.repo.update(userId, id, data);
-    await auditService.log(userId, 'reminder.update', 'reminder', id);
+  async update(scopeInput: ScopeInput, id: string, data: Parameters<ReminderRepository['update']>[2]): Promise<ReminderDTO> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    await this.get(scopeInput, id);
+    const updated = await this.repo.update(scopeInput, id, data);
+    await auditService.log(userId, 'reminder.update', 'reminder', id, undefined, undefined, orgId || undefined);
     return updated!;
   }
 
-  async remove(userId: string, id: string): Promise<void> {
-    await this.get(userId, id);
-    await this.repo.remove(userId, id);
-    await auditService.log(userId, 'reminder.delete', 'reminder', id);
+  async remove(scopeInput: ScopeInput, id: string): Promise<void> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    await this.get(scopeInput, id);
+    await this.repo.remove(scopeInput, id);
+    await auditService.log(userId, 'reminder.delete', 'reminder', id, undefined, undefined, orgId || undefined);
   }
 }
