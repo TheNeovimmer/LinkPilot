@@ -1,4 +1,4 @@
-import { handle, requireUser, requireOrg, requireSuperAdmin, ok, created, noContent, rawJson, sseResponse, type AuthUser } from '@/server/http';
+import { handle, requireUser, requireOrg, requireSuperAdmin, isSuperAdmin, ok, created, noContent, rawJson, sseResponse, type AuthUser } from '@/server/http';
 import { organizationService } from '@/modules/organizations/service';
 import { createOrgSchema, updateOrgSchema, inviteSchema, updateMemberRoleSchema } from '@/modules/organizations/schema';
 import { normalizeRole } from '@/modules/rbac/roles';
@@ -195,7 +195,7 @@ async function handleAvatar(req: Request, user: AuthUser): Promise<Response> {
   const { default: crypto } = await import('node:crypto');
   const { extname } = await import('node:path');
   const { default: multer } = await import('multer');
-  const { ensureUploadDir, writeUpload, removeUpload } = await import('@/lib/storage');
+  const { removeUpload } = await import('@/lib/storage');
   const { ApiError } = await import('@/utils/ApiError');
 
   const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
@@ -207,22 +207,22 @@ async function handleAvatar(req: Request, user: AuthUser): Promise<Response> {
   const buf = Buffer.from(await file.arrayBuffer());
   if (!sniffImage(buf, file.type)) throw ApiError.badRequest('File is not a valid image');
 
-  ensureUploadDir();
   const ext = extname(file.name).toLowerCase() || '.png';
   const filename = `${crypto.randomUUID()}${ext}`;
-  writeUpload(filename, buf);
 
   const url = `/uploads/${filename}`;
-  const profile = await userService.updateAvatar(user.id, url);
-  if (profile.image && profile.image !== url) {
-    removeUpload(profile.image);
+  const before = await userService.getProfile(user.id).catch(() => null);
+  const profile = await userService.updateAvatar(user.id, url, { data: buf, mime: file.type });
+  if (before?.image && before.image !== url) {
+    // Legacy on-disk avatar from before database storage (best-effort, never throws).
+    removeUpload(before.image);
   }
   // static serving handled by route/rewrite — placeholder for uploads URL
   void multer;
   return ok(profile);
 }
 
-// Attachments : upload / list / delete (multipart, stored under UPLOAD_DIR).
+// Attachments : upload / list / delete (multipart, bytes stored in the database).
 async function handleAttachments(req: Request, m: string, id: string | undefined, user: AuthUser): Promise<Response> {
   const { resolveDataScope } = await import('@/server/scope');
   const scope = await resolveDataScope(req, user);
@@ -237,12 +237,9 @@ async function handleAttachments(req: Request, m: string, id: string | undefined
     return noContent();
   }
   if (m === 'POST' && !id) {
-    const { default: fs } = await import('node:fs');
-    const { default: path } = await import('node:path');
     const { default: crypto } = await import('node:crypto');
     const { extname } = await import('node:path');
     const { isAttachmentKind } = await import('@/modules/attachments/types');
-    const { ensureUploadDir, writeUpload, removeUpload } = await import('@/lib/storage');
 
     const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
     const form = await req.formData();
@@ -257,29 +254,22 @@ async function handleAttachments(req: Request, m: string, id: string | undefined
     const kind = isAttachmentKind(kindRaw) ? kindRaw : 'other';
 
     const buf = Buffer.from(await file.arrayBuffer());
-    ensureUploadDir();
     const ext = extname(file.name).toLowerCase() || '.bin';
     const filename = `${crypto.randomUUID()}${ext}`;
     const url = `/uploads/${filename}`;
-    writeUpload(filename, buf);
 
-    try {
-      const attachment = await attachmentService.create(scope, {
-        applicationId,
-        noteId,
-        kind,
-        filename,
-        originalName: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        size: buf.byteLength,
-        url,
-      });
-      return created(attachment);
-    } catch (err) {
-      // Roll back the file if the DB write failed so orphans don't accumulate.
-      removeUpload(filename);
-      throw err;
-    }
+    const attachment = await attachmentService.create(scope, {
+      applicationId,
+      noteId,
+      kind,
+      filename,
+      originalName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      size: buf.byteLength,
+      url,
+      content: buf,
+    });
+    return created(attachment);
   }
   throw new Error(`Not found: ${m} /attachments`);
 }
@@ -362,17 +352,13 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
 
   const { minRoleFor, minRoleForAi } = await import('@/server/guards');
   const domainMin = minRoleFor(resource, m);
-  if (domainMin) {
-    const { prisma } = await import('@/database/prisma');
-    const me = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
-    if (me?.platformRole !== 'SUPER_ADMIN') await requireOrg(req, user, domainMin);
+  if (domainMin && !(await isSuperAdmin(req, user.id))) {
+    await requireOrg(req, user, domainMin);
   }
   if (resource === 'ai') {
     const aiMin = minRoleForAi(m);
-    if (aiMin) {
-      const { prisma } = await import('@/database/prisma');
-      const me = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
-      if (me?.platformRole !== 'SUPER_ADMIN') await requireOrg(req, user, aiMin);
+    if (aiMin && !(await isSuperAdmin(req, user.id))) {
+      await requireOrg(req, user, aiMin);
     }
   }
 
@@ -646,6 +632,11 @@ async function handleAi(req: Request, m: string, action: string | undefined, use
   const scope = await resolveDataScope(req, user);
   const body = await parseBody(req);
   const client = await getAiClient(user.id);
+  const { aiQuotaKey, consumeAiQuota } = await import('@/server/ai-quota');
+  const quota = consumeAiQuota(aiQuotaKey(scope));
+  if (!quota.allowed) {
+    throw ApiError.rateLimited('AI quota exceeded for this workspace. Try again in a few minutes.');
+  }
 
   if (action === 'draft-reply') {
     draftReplySchema.parse(body);
