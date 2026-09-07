@@ -130,11 +130,33 @@ npx tsx scripts/promote-admin.ts --list
 npx tsx scripts/promote-admin.ts you@company.com
 ```
 
-Invite links look like `/workspaces?token=...` and auto-accept on open when signed in with the invited email. Invite emails are not sent yet — copy the link from the UI.
+Invite links look like `/workspaces?token=...` and auto-accept on open when signed in with the invited email. Invite emails are not sent yet — copy the link from the UI. Your pending invites also live in-app under **Workspaces → Pending invites for you** (`GET /api/v1/organizations/invites/mine`).
 
-> Phase 2 scope: workspace-shared domain rows (today rows are still per-user), invite email delivery, cached memberships.
+### Super-admin dashboard access
 
-> **Production deployments**: the PWA service worker only activates in production builds (`npm run build && npm run start`), and the `UPLOAD_DIR` must point at a persistent volume so avatars and attachments survive restarts.
+1. Promote your account (server-side, needs DB access):
+
+```bash
+npx tsx scripts/promote-admin.ts --list
+npx tsx scripts/promote-admin.ts you@company.com
+```
+
+2. Sign out and back in so the session picks up `platformRole: SUPER_ADMIN`.
+3. The sidebar shows **Admin** (`/admin`); the API gate is `requireSuperAdmin` plus `GET /api/v1/auth/session` returning the role. Without the role the link is hidden and the API returns 403.
+
+### Uploads are stored in the database
+
+Attachments and avatars persist as `BYTEA` columns (`Attachment.data`, `User.avatarData`/`avatarMime`) and are served scope-gated via `/uploads/:filename` (session required, workspace ownership checked, `Cache-Control: private`). Legacy on-disk files under `UPLOAD_DIR` still serve as fallback when the caller owns the row — migrate once with:
+
+```bash
+npx tsx scripts/migrate-uploads-to-db.ts
+```
+
+### Data scoping notes
+
+Workspace rows are shared (`orgId`), pre-RBAC rows stay `orgId = null` and remain visible only to their owner — by design there is no automatic backfill. Dashboard `/dashboard/stats` is cached 30s per user+workspace. AI endpoints are limited to `AI_RATE_LIMIT_PER_HOUR` calls per workspace per hour (429 with retry hint when exceeded). Realtime notifications are single-process in-memory (see `src/server/realtime.ts`); multi-instance deploys need a shared broker.
+
+> **Production deployments**: the PWA service worker only activates in production builds (`npm run build && npm run start`). `UPLOAD_DIR` is now only a legacy fallback; new uploads live in the database so no persistent volume is required for files.
 
 ---
 
