@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { api, apiErrorMessage } from '@/lib/api';
 import { streamAI } from '@/lib/sse';
 import { cn } from '@/lib/utils';
+import { useCanWrite } from '@/stores/org';
 import { toast } from 'sonner';
 
 const TONES = [
@@ -38,6 +39,7 @@ interface AiComposerProps {
  */
 export function AiComposer({ conversationId, onMessageInserted }: AiComposerProps) {
   const queryClient = useQueryClient();
+  const canWrite = useCanWrite();
   const [input, setInput] = useState('');
   const [role, setRole] = useState<'ME' | 'THEM'>('ME');
 
@@ -175,7 +177,7 @@ export function AiComposer({ conversationId, onMessageInserted }: AiComposerProp
                   ))}
                 </SelectContent>
               </Select>
-              <Button size="icon-sm" variant="ghost" onClick={rewrite} disabled={streaming || !draft.trim()} title="Rewrite with current tone">
+              <Button size="icon-sm" variant="ghost" onClick={rewrite} disabled={streaming || !draft.trim() || !canWrite} title={canWrite ? 'Rewrite with current tone' : 'Viewers cannot use AI'}>
                 <Redo2 className="h-3.5 w-3.5" strokeWidth={1.75} />
               </Button>
               <Button size="icon-sm" variant="ghost" onClick={copyDraft} disabled={!draft.trim()} title="Copy">
@@ -261,14 +263,14 @@ export function AiComposer({ conversationId, onMessageInserted }: AiComposerProp
           />
         </div>
         <div className="flex shrink-0 flex-col gap-1.5">
-          <Button onClick={sendMessage} disabled={!input.trim() || streaming} title="Send message (Enter)">
+          <Button onClick={sendMessage} disabled={!input.trim() || streaming || !canWrite} title={canWrite ? 'Send message (Enter)' : 'Viewers cannot edit'}>
             <Send className="h-3.5 w-3.5" strokeWidth={1.75} />
           </Button>
           <Button
             variant={streaming ? 'secondary' : 'default'}
             onClick={streaming ? stopStreaming : draftReply}
-            disabled={!streaming && false}
-            title={streaming ? 'Stop drafting' : 'Draft reply with AI'}
+            disabled={(!streaming && false) || (!streaming && !canWrite)}
+            title={streaming ? 'Stop drafting' : canWrite ? 'Draft reply with AI' : 'Viewers cannot use AI'}
           >
             {streaming ? (
               <Square className="h-3.5 w-3.5" strokeWidth={1.75} />
