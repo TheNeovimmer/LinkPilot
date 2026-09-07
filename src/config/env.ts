@@ -28,6 +28,8 @@ const envSchema = z.object({
   AI_EMBEDDING_MODEL: z.string().optional(),
   /** AI streaming request timeout (ms). */
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  /** Max AI calls per workspace per hour (sliding window, per-process). */
+  AI_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(60),
   UPLOAD_DIR: z.string().default('uploads'),
   TRUST_PROXY: z.coerce.boolean().default(true),
 });
