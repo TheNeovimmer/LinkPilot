@@ -4,14 +4,15 @@ import { parsePagination, pickOrder, pickSort, prismaTakeSkip, buildMeta } from 
 import type { z } from 'zod';
 import type { noteQuerySchema } from './schema';
 import type { NoteDTO } from './types';
+import { normalizeScope, scopeAndWhere, scopeCreateData, scopeIdWhere, scopeReadWhere, type ScopeInput } from '../../server/scope';
 
 type ListQuery = z.infer<typeof noteQuerySchema>;
 
 export class NoteRepository {
-  async list(userId: string, query: ListQuery) {
+  async list(scopeInput: ScopeInput, query: ListQuery) {
+    const scope = normalizeScope(scopeInput);
     const { page, limit } = parsePagination(query);
-    const where: Prisma.NoteWhereInput = {
-      userId,
+    const where: Prisma.NoteWhereInput = scopeAndWhere(scope, {
       ...(query.pinned !== undefined ? { pinned: query.pinned } : {}),
       ...(query.tag ? { tags: { has: query.tag } } : {}),
       ...(query.q
@@ -22,7 +23,7 @@ export class NoteRepository {
             ],
           }
         : {}),
-    };
+    });
     const rows = await prisma.note.findMany({
       where,
       orderBy: [
@@ -35,27 +36,32 @@ export class NoteRepository {
     return { items: rows as NoteDTO[], meta: buildMeta({ page, limit }, total) };
   }
 
-  async findById(userId: string, id: string): Promise<NoteDTO | null> {
-    return prisma.note.findFirst({ where: { id, userId } }) as Promise<NoteDTO | null>;
+  async findById(scopeInput: ScopeInput, id: string): Promise<NoteDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    return prisma.note.findFirst({ where: scopeIdWhere(scope, id) }) as Promise<NoteDTO | null>;
   }
 
-  async create(userId: string, data: { title: string; content?: string | null; pinned?: boolean; tags?: string[] }): Promise<NoteDTO> {
-    return prisma.note.create({ data: { userId, ...data } }) as Promise<NoteDTO>;
+  async create(scopeInput: ScopeInput, data: { title: string; content?: string | null; pinned?: boolean; tags?: string[] }): Promise<NoteDTO> {
+    const scope = normalizeScope(scopeInput);
+    return prisma.note.create({ data: { ...scopeCreateData(scope), ...data } }) as Promise<NoteDTO>;
   }
 
-  async update(userId: string, id: string, data: Partial<{ title: string; content: string | null; pinned: boolean; tags: string[] }>): Promise<NoteDTO | null> {
-    const result = await prisma.note.updateMany({ where: { id, userId }, data });
+  async update(scopeInput: ScopeInput, id: string, data: Partial<{ title: string; content: string | null; pinned: boolean; tags: string[] }>): Promise<NoteDTO | null> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.note.updateMany({ where: scopeIdWhere(scope, id), data });
     if (result.count === 0) return null;
-    return this.findById(userId, id);
+    return this.findById(scope, id);
   }
 
-  async remove(userId: string, id: string): Promise<boolean> {
-    const result = await prisma.note.deleteMany({ where: { id, userId } });
+  async remove(scopeInput: ScopeInput, id: string): Promise<boolean> {
+    const scope = normalizeScope(scopeInput);
+    const result = await prisma.note.deleteMany({ where: scopeIdWhere(scope, id) });
     return result.count > 0;
   }
 
-  async tags(userId: string): Promise<string[]> {
-    const notes = await prisma.note.findMany({ where: { userId }, select: { tags: true }, take: 1000 });
+  async tags(scopeInput: ScopeInput): Promise<string[]> {
+    const scope = normalizeScope(scopeInput);
+    const notes = await prisma.note.findMany({ where: scopeReadWhere(scope), select: { tags: true }, take: 1000 });
     const counts = new Map<string, number>();
     for (const note of notes) {
       for (const tag of note.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
