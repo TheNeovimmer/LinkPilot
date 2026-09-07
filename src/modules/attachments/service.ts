@@ -35,6 +35,7 @@ export class AttachmentService {
       mimeType: string;
       size: number;
       url: string;
+      content?: Buffer;
     },
   ): Promise<AttachmentDTO> {
     const { userId, orgId } = normalizeScope(scopeInput);
@@ -50,6 +51,7 @@ export class AttachmentService {
       mimeType: input.mimeType,
       size: input.size,
       url: input.url,
+      ...(input.content ? { content: input.content } : {}),
     });
     await auditService.log(userId, 'attachment.create', 'attachment', attachment.id, { kind }, undefined, orgId || undefined);
     return attachment;
@@ -59,11 +61,18 @@ export class AttachmentService {
     return this.repo.listFor(scopeInput, applicationId ?? null, noteId ?? null);
   }
 
+  /** File bytes for the /uploads serving route (null when missing or legacy without data). */
+  async findFile(scopeInput: ScopeInput, filename: string) {
+    const file = await this.repo.findFileByName(scopeInput, filename);
+    if (!file?.data) return null;
+    return { mimeType: file.mimeType, size: file.size, data: file.data };
+  }
+
   async remove(scopeInput: ScopeInput, id: string): Promise<void> {
     const { userId, orgId } = normalizeScope(scopeInput);
     const attachment = await this.repo.remove(scopeInput, id);
     if (!attachment) throw ApiError.notFound('Attachment not found');
-    // Best-effort cleanup of the underlying file (never throws on IO errors).
+    // Legacy filesystem cleanup for pre-DB rows (never throws on IO errors).
     const { removeUpload } = await import('@/lib/storage');
     removeUpload(attachment.url);
     await auditService.log(userId, 'attachment.delete', 'attachment', id, undefined, undefined, orgId || undefined);
