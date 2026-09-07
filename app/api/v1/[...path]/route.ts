@@ -401,19 +401,21 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
       throw new Error('Not found: conversations');
     }
     case 'recruiters': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'pipeline') return ok(await recruiterService.pipeline(user.id));
+      if (m === 'GET' && id === 'pipeline') return ok(await recruiterService.pipeline(scope));
       if (m === 'GET' && !id) {
-        const r = await recruiterService.list(user.id, queryOf(req, recruiterQuerySchema));
+        const r = await recruiterService.list(scope, queryOf(req, recruiterQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof recruiterService.create>[1]>(createRecruiterSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await recruiterService.create(scope, asServiceInput<Parameters<typeof recruiterService.create>[1]>(createRecruiterSchema.parse(await parseBody(req)))));
       if (isId(id)) {
         recruiterIdSchema.parse({ id });
-        if (m === 'GET') return ok(await recruiterService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof recruiterService.update>[2]>(updateRecruiterSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await recruiterService.get(scope, id));
+        if (m === 'PATCH') return ok(await recruiterService.update(scope, id, asServiceInput<Parameters<typeof recruiterService.update>[2]>(updateRecruiterSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await recruiterService.remove(user.id, id);
+          await recruiterService.remove(scope, id);
           return noContent();
         }
       }
