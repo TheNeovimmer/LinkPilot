@@ -13,9 +13,10 @@ export class AuditService {
     entityId?: string,
     meta?: Prisma.InputJsonValue,
     ip?: string,
+    orgId?: string | null,
   ): Promise<void> {
     try {
-      await this.repo.log({ userId, action, entity, entityId, meta, ip });
+      await this.repo.log({ userId, orgId: orgId ?? null, action, entity, entityId, meta, ip });
     } catch {
       // Audit must never break the primary operation.
     }
