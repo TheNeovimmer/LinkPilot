@@ -18,6 +18,7 @@ import { JobFormDialog } from '@/components/jobs/job-form';
 import { JobAnalyzeDialog } from '@/components/jobs/job-analyze';
 import { JobImportDialog } from '@/components/jobs/job-import';
 import { useLocale } from '@/stores/locale';
+import { useCanWrite } from '@/stores/org';
 import { cn } from '@/lib/utils';
 import { formatSalary, timeAgo } from '@/lib/format';
 import { toast } from 'sonner';
@@ -28,6 +29,7 @@ const BULK_TARGETS = ['APPLIED', 'INTERVIEWING', 'OFFER', 'REJECTED', 'CLOSED'] 
 
 export function JobsPage() {
   const t = useLocale((s) => s.t);
+  const canWrite = useCanWrite();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [q, setQ] = useState('');
@@ -118,11 +120,11 @@ export function JobsPage() {
               <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
               Export CSV
             </Button>
-            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+            <Button variant="secondary" onClick={() => setImportOpen(true)} disabled={!canWrite} title={canWrite ? undefined : 'Viewers cannot edit'}>
               <ImportIcon className="h-3.5 w-3.5" strokeWidth={1.75} />
               Import from URL
             </Button>
-            <Button onClick={() => setFormOpen(true)}>
+            <Button onClick={() => setFormOpen(true)} disabled={!canWrite} title={canWrite ? undefined : 'Viewers cannot edit'}>
               <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
               Add job
             </Button>
