@@ -14,6 +14,7 @@ import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { APPLICATION_STATUS_META } from '@/components/common/status-badge';
 import { ApplicationFormDialog } from '@/components/applications/application-form';
 import { useLocale } from '@/stores/locale';
+import { useCanWrite } from '@/stores/org';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/format';
 import { toast } from 'sonner';
@@ -31,6 +32,7 @@ const PIPELINE: { key: string; labelKey: string }[] = [
 
 export function ApplicationsPage() {
   const t = useLocale((s) => s.t);
+  const canWrite = useCanWrite();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [status, setStatus] = useState('');
@@ -96,7 +98,7 @@ export function ApplicationsPage() {
               <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
               Export CSV
             </Button>
-            <Button onClick={() => setFormOpen(true)}>
+            <Button onClick={() => setFormOpen(true)} disabled={!canWrite} title={canWrite ? undefined : 'Viewers cannot edit'}>
               <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
               Log application
             </Button>
