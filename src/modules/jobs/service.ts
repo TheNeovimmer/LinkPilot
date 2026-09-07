@@ -7,6 +7,7 @@ import { buildImportJobMessages, importJobSchema, type ImportJob } from '../../p
 import { fetchJobContent, isLikelyUrl, normalizeUrl } from '../../utils/job-fetch';
 import type { JobDTO } from './types';
 import { JobRepository } from './repository';
+import { normalizeScope, scopeAndWhere, type ScopeInput } from '../../server/scope';
 
 export class JobService {
   constructor(private readonly repo: JobRepository) {}
@@ -34,40 +35,44 @@ export class JobService {
     }
   }
 
-  async list(userId: string, query: Parameters<JobRepository['list']>[1]) {
-    return this.repo.list(userId, query);
+  async list(scopeInput: ScopeInput, query: Parameters<JobRepository['list']>[1]) {
+    return this.repo.list(scopeInput, query);
   }
 
-  async get(userId: string, id: string): Promise<JobDTO> {
-    const job = await this.repo.findById(userId, id);
+  async get(scopeInput: ScopeInput, id: string): Promise<JobDTO> {
+    const job = await this.repo.findById(scopeInput, id);
     if (!job) throw ApiError.notFound('Job not found');
     return job;
   }
 
-  async create(userId: string, data: Parameters<JobRepository['create']>[1]): Promise<JobDTO> {
-    const job = await this.repo.create(userId, data);
+  async create(scopeInput: ScopeInput, data: Parameters<JobRepository['create']>[1]): Promise<JobDTO> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    const job = await this.repo.create(scopeInput, data);
     void this.embedJob(userId, job);
-    await auditService.log(userId, 'job.create', 'job', job.id, { title: job.title });
+    await auditService.log(userId, 'job.create', 'job', job.id, { title: job.title }, undefined, orgId || undefined);
     return job;
   }
 
-  async update(userId: string, id: string, data: Parameters<JobRepository['update']>[2]): Promise<JobDTO> {
-    await this.get(userId, id);
-    const updated = await this.repo.update(userId, id, data);
+  async update(scopeInput: ScopeInput, id: string, data: Parameters<JobRepository['update']>[2]): Promise<JobDTO> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    await this.get(scopeInput, id);
+    const updated = await this.repo.update(scopeInput, id, data);
     if (updated) void this.embedJob(userId, updated);
-    await auditService.log(userId, 'job.update', 'job', id);
+    await auditService.log(userId, 'job.update', 'job', id, undefined, undefined, orgId || undefined);
     return updated!;
   }
 
   /** Bulk status move (e.g. mark a batch of watchlist jobs as applied). */
-  async bulkUpdate(userId: string, ids: string[], status: JobDTO['status']): Promise<number> {
-    const result = await this.repo.bulkUpdate(userId, ids, status);
-    await auditService.log(userId, 'job.bulkUpdate', 'job', undefined, { count: result, status });
+  async bulkUpdate(scopeInput: ScopeInput, ids: string[], status: JobDTO['status']): Promise<number> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    const result = await this.repo.bulkUpdate(scopeInput, ids, status);
+    await auditService.log(userId, 'job.bulkUpdate', 'job', undefined, { count: result, status }, undefined, orgId || undefined);
     return result;
   }
 
   /** AI import: paste a job posting URL/text → structured job (reuses or creates the company). */
-  async importFromText(userId: string, text: string): Promise<JobDTO> {
+  async importFromText(scopeInput: ScopeInput, text: string): Promise<JobDTO> {
+    const { userId, orgId } = normalizeScope(scopeInput);
     const client = await getAiClient(userId);
     if (!client.isConfigured()) throw ApiError.aiNotConfigured();
 
@@ -90,17 +95,17 @@ export class JobService {
     let companyId: string | null | undefined = extracted.companyName
       ? (
           await prisma.company.findFirst({
-            where: { userId, name: { equals: extracted.companyName, mode: 'insensitive' } },
+            where: scopeAndWhere({ userId, orgId }, { name: { equals: extracted.companyName, mode: 'insensitive' } }),
             select: { id: true },
           })
         )?.id
       : undefined;
     if (extracted.companyName && !companyId) {
-      const company = await prisma.company.create({ data: { userId, name: extracted.companyName } });
+      const company = await prisma.company.create({ data: { userId, orgId: orgId || null, name: extracted.companyName } });
       companyId = company.id;
     }
 
-    const job = await this.repo.create(userId, {
+    const job = await this.repo.create(scopeInput, {
       title: extracted.title,
       companyId: companyId ?? undefined,
       url: extracted.url ?? url, // fall back to the pasted link when the model returns none
@@ -112,22 +117,23 @@ export class JobService {
       status: 'WATCHLIST',
     });
     void this.embedJob(userId, job);
-    await auditService.log(userId, 'job.import', 'job', job.id, { title: job.title, company: extracted.companyName });
+    await auditService.log(userId, 'job.import', 'job', job.id, { title: job.title, company: extracted.companyName }, undefined, orgId || undefined);
     return job;
   }
 
-  async remove(userId: string, id: string): Promise<void> {
-    await this.get(userId, id);
-    await this.repo.remove(userId, id);
-    await auditService.log(userId, 'job.delete', 'job', id);
+  async remove(scopeInput: ScopeInput, id: string): Promise<void> {
+    const { userId, orgId } = normalizeScope(scopeInput);
+    await this.get(scopeInput, id);
+    await this.repo.remove(scopeInput, id);
+    await auditService.log(userId, 'job.delete', 'job', id, undefined, undefined, orgId || undefined);
   }
 
-  async stats(userId: string) {
-    return this.repo.stats(userId);
+  async stats(scopeInput: ScopeInput) {
+    return this.repo.stats(scopeInput);
   }
 
   /** Embedding-based search (vector ops). Caller handles the fallback. */
-  async semanticSearch(userId: string, embedding: number[], limit: number) {
-    return this.repo.semanticSearch(userId, embedding, limit);
+  async semanticSearch(scopeInput: ScopeInput, embedding: number[], limit: number) {
+    return this.repo.semanticSearch(scopeInput, embedding, limit);
   }
 }
