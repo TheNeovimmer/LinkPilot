@@ -10,6 +10,7 @@ type ListQuery = z.infer<typeof auditQuerySchema>;
 export class AuditLogRepository {
   async log(data: {
     userId?: string | null;
+    orgId?: string | null;
     action: string;
     entity?: string;
     entityId?: string;
