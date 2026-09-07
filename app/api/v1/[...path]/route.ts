@@ -356,18 +356,20 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
   const m = method(req);
   const [resource, ...rest] = path;
 
-  const DOMAIN_READ = new Set(['companies', 'conversations', 'recruiters', 'jobs', 'applications', 'interviews', 'notes', 'reminders', 'notifications', 'dashboard', 'attachments']);
-  if (DOMAIN_READ.has(resource)) {
+  const { minRoleFor, minRoleForAi } = await import('@/server/guards');
+  const domainMin = minRoleFor(resource, m);
+  if (domainMin) {
     const { prisma } = await import('@/database/prisma');
     const me = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
-    if (me?.platformRole !== 'SUPER_ADMIN') {
-      await requireOrg(req, user, m === 'GET' ? 'VIEWER' : 'MEMBER');
-    }
+    if (me?.platformRole !== 'SUPER_ADMIN') await requireOrg(req, user, domainMin);
   }
-  if (resource === 'ai' && m === 'POST') {
-    const { prisma } = await import('@/database/prisma');
-    const me = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
-    if (me?.platformRole !== 'SUPER_ADMIN') await requireOrg(req, user, 'MEMBER');
+  if (resource === 'ai') {
+    const aiMin = minRoleForAi(m);
+    if (aiMin) {
+      const { prisma } = await import('@/database/prisma');
+      const me = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
+      if (me?.platformRole !== 'SUPER_ADMIN') await requireOrg(req, user, aiMin);
+    }
   }
 
   switch (resource) {
