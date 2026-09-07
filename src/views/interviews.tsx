@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { InterviewFormDialog } from '@/components/interviews/interview-form';
 import { InterviewPrepDialog } from '@/components/interviews/interview-prep';
 import { cn } from '@/lib/utils';
+import { useCanWrite } from '@/stores/org';
 import { formatDateTime } from '@/lib/format';
 import { toast } from 'sonner';
 import type { Interview } from '@/types';
@@ -27,6 +28,7 @@ const MODE_META: Record<string, { label: string; className: string }> = {
 };
 
 export function InterviewsPage() {
+  const canWrite = useCanWrite();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<'SCHEDULED' | 'COMPLETED'>('SCHEDULED');
@@ -86,7 +88,7 @@ export function InterviewsPage() {
         title="Interviews"
         description="Everything scheduled, with AI prep for each round."
         actions={
-          <Button onClick={() => setFormOpen(true)}>
+          <Button onClick={() => setFormOpen(true)} disabled={!canWrite} title={canWrite ? undefined : 'Viewers cannot edit'}>
             <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
             Schedule interview
           </Button>
