@@ -39,4 +39,7 @@ describe('scopeCreateData', () => {
   it('dual-writes user and org', () => {
     assert.deepEqual(scopeCreateData({ userId: 'u1', orgId: 'o1' }), { userId: 'u1', orgId: 'o1' });
   });
+  it('nulls empty orgId to keep the legacy personal invariant', () => {
+    assert.deepEqual(scopeCreateData({ userId: 'u1', orgId: '' }), { userId: 'u1', orgId: null });
+  });
 });
