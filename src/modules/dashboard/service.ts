@@ -1,7 +1,15 @@
 import { prisma } from '../../database/prisma';
 import type { ConversationStatus, RecruiterStatus, JobStatus, ApplicationStatus } from '@prisma/client';
 import type { DashboardStats } from './types';
-import { normalizeScope, scopeAndWhere, scopeReadWhere, type ScopeInput } from '../../server/scope';
+import { normalizeScope, scopeAndWhere, scopeReadWhere, type DataScope, type ScopeInput } from '../../server/scope';
+
+/** Stats freshness window. Dashboards tolerate brief staleness; writes stay uncached. */
+const STATS_TTL_MS = 30_000;
+const statsCache = new Map<string, { at: number; data: DashboardStats }>();
+
+export function dashboardCacheKey(scope: DataScope): string {
+  return `${scope.userId}::${scope.orgId}`;
+}
 
 export class DashboardService {
   private async compute(scopeInput: ScopeInput): Promise<DashboardStats> {
@@ -205,8 +213,14 @@ export class DashboardService {
     };
   }
 
-  /** Dashboard stats (computed on demand — no cache). */
+  /** Dashboard stats with a short TTL cache (single-process, like the realtime registry). */
   async stats(scopeInput: ScopeInput): Promise<DashboardStats> {
-    return this.compute(scopeInput);
+    const scope = normalizeScope(scopeInput);
+    const key = dashboardCacheKey(scope);
+    const hit = statsCache.get(key);
+    if (hit && Date.now() - hit.at < STATS_TTL_MS) return hit.data;
+    const data = await this.compute(scopeInput);
+    statsCache.set(key, { at: Date.now(), data });
+    return data;
   }
 }
