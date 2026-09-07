@@ -1,13 +1,23 @@
 import { prisma } from '../src/database/prisma';
 
-const email = process.argv[2]?.toLowerCase();
-if (!email) {
-  console.error('Usage: npx tsx scripts/promote-admin.ts you@company.com');
+const arg = process.argv[2]?.toLowerCase();
+if (!arg) {
+  console.error('Usage: npx tsx scripts/promote-admin.ts you@company.com | --list');
   process.exit(1);
 }
 
+if (arg === '--list') {
+  const users = await prisma.user.findMany({
+    orderBy: { createdAt: 'asc' },
+    select: { email: true, name: true, platformRole: true },
+  });
+  for (const u of users) console.log(`${u.platformRole}\t${u.email}\t${u.name ?? ''}`);
+  await prisma.$disconnect();
+  process.exit(0);
+}
+
 const user = await prisma.user.update({
-  where: { email },
+  where: { email: arg },
   data: { platformRole: 'SUPER_ADMIN' },
   select: { id: true, email: true, platformRole: true },
 });
