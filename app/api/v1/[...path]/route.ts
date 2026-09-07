@@ -224,14 +224,16 @@ async function handleAvatar(req: Request, user: AuthUser): Promise<Response> {
 
 // Attachments : upload / list / delete (multipart, stored under UPLOAD_DIR).
 async function handleAttachments(req: Request, m: string, id: string | undefined, user: AuthUser): Promise<Response> {
+  const { resolveDataScope } = await import('@/server/scope');
+  const scope = await resolveDataScope(req, user);
   if (m === 'GET') {
     const q = new URL(req.url).searchParams;
     const applicationId = q.get('applicationId') || null;
     const noteId = q.get('noteId') || null;
-    return ok(await attachmentService.list(user.id, applicationId, noteId));
+    return ok(await attachmentService.list(scope, applicationId, noteId));
   }
   if (m === 'DELETE' && id) {
-    await attachmentService.remove(user.id, id);
+    await attachmentService.remove(scope, id);
     return noContent();
   }
   if (m === 'POST' && !id) {
@@ -262,7 +264,7 @@ async function handleAttachments(req: Request, m: string, id: string | undefined
     writeUpload(filename, buf);
 
     try {
-      const attachment = await attachmentService.create(user.id, {
+      const attachment = await attachmentService.create(scope, {
         applicationId,
         noteId,
         kind,
