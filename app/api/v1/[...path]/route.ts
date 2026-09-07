@@ -292,19 +292,21 @@ function sniffImage(buf: Buffer, mimetype: string): boolean {
 
 // Companies
 async function handleCompanies(req: Request, method: string, path: string[], user: AuthUser): Promise<Response> {
+  const { resolveDataScope } = await import('@/server/scope');
+  const scope = await resolveDataScope(req, user);
   const id = path[1];
   if (method === 'GET' && !id && id !== 'all') {
-    const r = await companyService.list(user.id, queryOf(req, companyQuerySchema));
+    const r = await companyService.list(scope, queryOf(req, companyQuerySchema));
     return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
   }
-  if (method === 'GET' && id === 'all') return ok(await companyService.all(user.id));
-  if (method === 'POST' && !id) return created(await asServiceInput<Parameters<typeof companyService.create>[1]>(createCompanySchema.parse(await parseBody(req))));
+  if (method === 'GET' && id === 'all') return ok(await companyService.all(scope));
+  if (method === 'POST' && !id) return created(await companyService.create(scope, asServiceInput<Parameters<typeof companyService.create>[1]>(createCompanySchema.parse(await parseBody(req)))));
   if (id && id !== 'all') {
     companyIdSchema.parse({ id });
-    if (method === 'GET') return ok(await companyService.get(user.id, id));
-    if (method === 'PATCH') return ok(await asServiceInput<Parameters<typeof companyService.update>[2]>(updateCompanySchema.parse(await parseBody(req))));
+    if (method === 'GET') return ok(await companyService.get(scope, id));
+    if (method === 'PATCH') return ok(await companyService.update(scope, id, asServiceInput<Parameters<typeof companyService.update>[2]>(updateCompanySchema.parse(await parseBody(req)))));
     if (method === 'DELETE') {
-      await companyService.remove(user.id, id);
+      await companyService.remove(scope, id);
       return noContent();
     }
   }
