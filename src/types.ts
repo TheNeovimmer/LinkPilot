@@ -238,7 +238,14 @@ export interface DashboardStats {
     upcoming: { id: string; title: string; scheduledAt: string; mode: InterviewMode; companyName: string | null }[];
     completed: number;
   };
-  reminders: { overdue: number; dueNext48h: number };
+  reminders: { overdue: number; dueNext48h: number; items: { id: string; title: string; dueAt: string }[] };
+  attention: {
+    staleApplications: { id: string; roleTitle: string | null; companyName: string | null; appliedAt: string | null; waitingDays: number }[];
+    staleRecruiters: { id: string; name: string; lastContactAt: string | null }[];
+  };
+  momentum: { appsThisWeek: number; interviewsNext7: number; messagesLast7Days: number };
+  recentApplications: { id: string; roleTitle: string | null; companyName: string | null; status: ApplicationStatus; appliedAt: string | null }[];
+  topJobs: { id: string; title: string; companyName: string | null; fitScore: number }[];
   analytics: {
     funnel: { submitted: number; interviewing: number; offers: number; accepted: number; rejected: number };
     applicationsTrend: { date: string; count: number }[];

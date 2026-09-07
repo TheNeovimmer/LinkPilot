@@ -11,6 +11,11 @@ import {
   Sparkles,
   Users,
   AlertCircle,
+  Plus,
+  Clock,
+  Flame,
+  TrendingUp,
+  Star,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { StatCard } from '@/components/common/stat-card';
@@ -48,12 +53,15 @@ export function DashboardPage() {
   });
 
   const jobCount = stats?.jobs.total ?? 0;
-  const applyTotal = (stats?.jobs.APPLIED ?? 0) + (stats?.jobs.INTERVIEWING ?? 0) + (stats?.jobs.OFFER ?? 0);
+  const apps = stats?.applications;
+  const applyTotal = ((apps?.SUBMITTED ?? 0) + (apps?.UNDER_REVIEW ?? 0) + (apps?.INTERVIEWING ?? 0) + (apps?.OFFER ?? 0));
+  const momentum = stats?.momentum;
+  const attention = stats?.attention;
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Greeting */}
-      <div className="flex items-start justify-between">
+      {/* Greeting + quick actions */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">{t('dashboard.overview')}</p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-text">
@@ -64,6 +72,18 @@ export function DashboardPage() {
               ? t('dashboard.nextInterview', { date: formatDateTime(stats.interviews.upcoming[0]?.scheduledAt) })
               : t('dashboard.noInterviews')}
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/applications?new=1" className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-3 text-[12.5px] font-medium text-accent-ink transition-colors hover:bg-accent-strong">
+            <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+            {t('dashboard.quick.logApp')}
+          </Link>
+          <Link href="/jobs?new=1" className="inline-flex h-8 items-center rounded-[var(--radius-control)] border border-border bg-surface px-3 text-[12.5px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text">
+            {t('dashboard.quick.addJob')}
+          </Link>
+          <Link href="/interviews?new=1" className="hidden h-8 items-center rounded-[var(--radius-control)] border border-border bg-surface px-3 text-[12.5px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text sm:inline-flex">
+            {t('dashboard.quick.schedule')}
+          </Link>
         </div>
       </div>
 
@@ -86,20 +106,87 @@ export function DashboardPage() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[92px] rounded-[var(--radius-card)]" />)
           ) : (
             <>
-              <StatCard label={t('dashboard.stat.conversations')} value={stats?.conversations.active ?? 0} icon={MessageSquare} hint={t('dashboard.stat.total', { n: stats?.conversations.total ?? 0 })} onClick={() => undefined} />
-              <StatCard label={t('dashboard.stat.activeApps')} value={applyTotal} icon={Send} accent="accent" hint={t('dashboard.stat.jobsTracked', { n: stats?.jobs.total ?? 0 })} />
-              <StatCard label={t('dashboard.stat.recruiters')} value={stats?.recruiters.total ?? 0} icon={Users} hint={t('dashboard.stat.inInterviews', { n: stats?.recruiters.INTERVIEW_SCHEDULED ?? 0 })} />
-              <StatCard
+              <Link href="/conversations" className="block"><StatCard label={t('dashboard.stat.conversations')} value={stats?.conversations.active ?? 0} icon={MessageSquare} hint={t('dashboard.stat.total', { n: stats?.conversations.total ?? 0 })} /></Link>
+              <Link href="/applications" className="block"><StatCard label={t('dashboard.stat.activeApps')} value={applyTotal} icon={Send} accent="accent" hint={t('dashboard.stat.jobsTracked', { n: stats?.jobs.total ?? 0 })} /></Link>
+              <Link href="/recruiters" className="block"><StatCard label={t('dashboard.stat.recruiters')} value={stats?.recruiters.total ?? 0} icon={Users} hint={t('dashboard.stat.inInterviews', { n: stats?.recruiters.INTERVIEW_SCHEDULED ?? 0 })} /></Link>
+              <Link href="/jobs" className="block"><StatCard
                 label={t('dashboard.stat.avgFit')}
                 value={stats?.jobs.avgFitScore != null ? `${Math.round(stats.jobs.avgFitScore)}` : '—'}
                 icon={Sparkles}
                 accent="warning"
                 hint={jobStats ? t('dashboard.stat.analyzed', { n: jobStats.analyzed }) : undefined}
-              />
+              /></Link>
             </>
           )}
         </div>
       </Reveal>
+
+      {/* Attention + momentum */}
+      {stats && !isLoading ? (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex-row items-center gap-2">
+              <Flame className="h-4 w-4 text-warning" strokeWidth={1.75} />
+              <CardTitle>{t('dashboard.attention.title')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(attention?.staleApplications?.length || stats.reminders.items?.filter((r) => new Date(r.dueAt).getTime() < Date.parse(stats.generatedAt)).length || attention?.staleRecruiters?.length) ? (
+                <div className="divide-y divide-border/60">
+                  {(attention?.staleApplications ?? []).slice(0, 3).map((a) => (
+                    <Link key={a.id} href="/applications" className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-warning-muted ring-1 ring-border">
+                        <Clock className="h-3.5 w-3.5 text-warning" strokeWidth={2} />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[13px] text-text-secondary">{a.roleTitle ?? 'Application'} at {a.companyName ?? 'unknown'} · {a.waitingDays}d no reply</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-text-muted" strokeWidth={1.75} />
+                    </Link>
+                  ))}
+                  {(stats.reminders.items ?? []).filter((r) => new Date(r.dueAt).getTime() < Date.parse(stats.generatedAt)).slice(0, 2).map((r) => (
+                    <Link key={r.id} href="/reminders" className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-destructive/10 ring-1 ring-border">
+                        <AlertCircle className="h-3.5 w-3.5 text-destructive" strokeWidth={2} />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[13px] text-text-secondary">{r.title} · overdue {formatDateTime(r.dueAt)}</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-text-muted" strokeWidth={1.75} />
+                    </Link>
+                  ))}
+                  {(attention?.staleRecruiters ?? []).slice(0, 2).map((r) => (
+                    <Link key={r.id} href="/recruiters" className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-surface-2 ring-1 ring-border">
+                        <Users className="h-3.5 w-3.5 text-text-secondary" strokeWidth={1.75} />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[13px] text-text-secondary">{r.name} · no contact {timeAgo(r.lastContactAt)}</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-text-muted" strokeWidth={1.75} />
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[13px] text-text-muted">{t('dashboard.attention.empty')}</p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex-row items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-accent" strokeWidth={1.75} />
+              <CardTitle>{t('dashboard.momentum.title')}</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-3 gap-2 lg:grid-cols-1 xl:grid-cols-3">
+              <div className="rounded-[var(--radius-control)] bg-surface-2 px-3 py-2.5 text-center">
+                <p className="font-mono text-lg leading-none text-text">{momentum?.appsThisWeek ?? 0}</p>
+                <p className="mt-1 text-[10.5px] text-text-muted">{t('dashboard.momentum.apps')}</p>
+              </div>
+              <div className="rounded-[var(--radius-control)] bg-surface-2 px-3 py-2.5 text-center">
+                <p className="font-mono text-lg leading-none text-text">{momentum?.interviewsNext7 ?? stats.interviews.upcoming.length}</p>
+                <p className="mt-1 text-[10.5px] text-text-muted">{t('dashboard.momentum.interviews')}</p>
+              </div>
+              <div className="rounded-[var(--radius-control)] bg-surface-2 px-3 py-2.5 text-center">
+                <p className="font-mono text-lg leading-none text-text">{momentum?.messagesLast7Days ?? stats.conversations.messagesLast7Days}</p>
+                <p className="mt-1 text-[10.5px] text-text-muted">{t('dashboard.momentum.messages')}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       {/* Command center — funnel, response analytics, open offers, trend */}
       {stats && !isLoading && <CommandCenter analytics={stats.analytics} />}
@@ -125,8 +212,8 @@ export function DashboardPage() {
               </div>
             ) : stats?.interviews.upcoming.length ? (
               <div className="divide-y divide-border/60">
-                {stats.interviews.upcoming.map((i) => (
-                  <Link key={i.id} href={`/interviews/${i.id}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                {stats.interviews.upcoming.slice(0, 5).map((i) => (
+                  <Link key={i.id} href="/interviews" className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-surface-2 ring-1 ring-border">
                       <Briefcase className="h-4 w-4 text-text-secondary" strokeWidth={1.75} />
                     </div>
@@ -207,6 +294,62 @@ export function DashboardPage() {
       </div>
       </Reveal>
 
+      {/* Recent apps + top fit */}
+      {stats && !isLoading ? (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Send className="h-4 w-4 text-text-muted" strokeWidth={1.75} />
+                {t('dashboard.recentApps')}
+              </CardTitle>
+              <Link href="/applications" className="flex items-center gap-0.5 text-[12px] text-accent transition-colors hover:text-accent-strong">
+                {t('dashboard.viewAll')} <ArrowUpRight className="h-3 w-3" strokeWidth={1.75} />
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {(stats.recentApplications ?? []).length ? (
+                <div className="divide-y divide-border/60">
+                  {(stats.recentApplications ?? []).map((a) => (
+                    <Link key={a.id} href="/applications" className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-text">{a.roleTitle ?? 'Application'} <span className="font-normal text-text-muted">· {a.companyName ?? ''}</span></span>
+                      <span className="shrink-0 font-mono text-[11px] text-text-muted">{a.status}</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[13px] text-text-muted">{t('dashboard.job.empty')}</p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Star className="h-4 w-4 text-warning" strokeWidth={1.75} />
+                {t('dashboard.topJobs')}
+              </CardTitle>
+              <Link href="/jobs" className="flex items-center gap-0.5 text-[12px] text-accent transition-colors hover:text-accent-strong">
+                {t('dashboard.viewAll')} <ArrowUpRight className="h-3 w-3" strokeWidth={1.75} />
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {(stats.topJobs ?? []).length ? (
+                <div className="space-y-2">
+                  {(stats.topJobs ?? []).map((j) => (
+                    <Link key={j.id} href="/jobs" className="flex items-center justify-between gap-2 rounded-[var(--radius-control)] border border-border bg-surface-2 px-3 py-2 transition-colors hover:border-border-strong">
+                      <span className="min-w-0 truncate text-[12.5px] font-medium text-text">{j.title}</span>
+                      <span className="shrink-0 rounded-full bg-warning-muted px-2 py-0.5 font-mono text-[11px] text-warning">{j.fitScore}</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[13px] text-text-muted">{t('dashboard.topJobs.empty')}</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
       {/* Job pipeline summary */}
       <Reveal delay={0.15}>
         <Card>
@@ -238,10 +381,10 @@ export function DashboardPage() {
                 ['REJECTED', 'job.status.REJECTED'],
                 ['CLOSED', 'job.status.CLOSED'],
               ] as const).map(([key, labelKey]) => (
-                <div key={key} className="rounded-[var(--radius-control)] border border-border bg-surface-2 px-3 py-2.5">
+                <Link key={key} href="/jobs" className="rounded-[var(--radius-control)] border border-border bg-surface-2 px-3 py-2.5 transition-colors hover:border-border-strong">
                   <p className="font-mono text-lg leading-none text-text">{(stats?.jobs[key] as number) ?? 0}</p>
                   <p className="mt-1 text-[11px] text-text-muted">{t(labelKey)}</p>
-                </div>
+                </Link>
               ))}
             </div>
           )}

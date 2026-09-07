@@ -18,6 +18,13 @@ export interface DashboardStats {
   recruiters: Partial<Record<RecruiterStatus, number>> & { total: number };
   jobs: Partial<Record<JobStatus, number>> & { total: number; avgFitScore: number | null };
   applications: Partial<Record<ApplicationStatus, number>> & { total: number };
+  attention: {
+    staleApplications: { id: string; roleTitle: string | null; companyName: string | null; appliedAt: Date | null; waitingDays: number }[];
+    staleRecruiters: { id: string; name: string; lastContactAt: Date | null }[];
+  };
+  momentum: { appsThisWeek: number; interviewsNext7: number; messagesLast7Days: number };
+  recentApplications: { id: string; roleTitle: string | null; companyName: string | null; status: ApplicationStatus; appliedAt: Date | null }[];
+  topJobs: { id: string; title: string; companyName: string | null; fitScore: number }[];
   interviews: {
     upcoming: {
       id: string;
@@ -31,6 +38,7 @@ export interface DashboardStats {
   reminders: {
     overdue: number;
     dueNext48h: number;
+    items: { id: string; title: string; dueAt: Date }[];
   };
   /** Job-search decision intelligence (computed from application timestamps). */
   analytics: {

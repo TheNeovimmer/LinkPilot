@@ -6,7 +6,7 @@ export class DashboardService {
   private async compute(userId: string): Promise<DashboardStats> {
     const now = new Date();
 
-    const [conversations, jobs, applications, recruiters, interviews, _reminders, messages] =
+    const [conversations, jobs, applications, recruiters, interviews, messages] =
       await Promise.all([
         prisma.conversation.groupBy({ by: ['status'], where: { userId }, _count: true }),
         prisma.job.groupBy({ by: ['status'], where: { userId }, _count: true }),
@@ -17,10 +17,6 @@ export class DashboardService {
           orderBy: { scheduledAt: 'asc' },
           take: 6,
           select: { id: true, title: true, scheduledAt: true, mode: true, job: { select: { company: { select: { name: true } } } } },
-        }),
-        prisma.reminder.aggregate({
-          where: { userId, done: false },
-          _count: true,
         }),
         prisma.message.count({
           where: { conversation: { userId }, createdAt: { gte: new Date(now.getTime() - 7 * 86_400_000) } },
@@ -43,6 +39,17 @@ export class DashboardService {
         prisma.interview.count({ where: { userId, status: 'COMPLETED' } }),
         prisma.conversation.count({ where: { userId } }),
         prisma.conversation.count({ where: { userId, status: 'ACTIVE' } }),
+      ]);
+
+    const [staleApps, staleRecs, reminderItems, recentApps, topJobsRows, appsThisWeek, interviewsNext7] =
+      await Promise.all([
+        prisma.application.findMany({ where: { userId, appliedAt: { lte: new Date(now.getTime() - 7 * 86_400_000) }, firstResponseAt: null, status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } }, orderBy: { appliedAt: 'asc' }, take: 5, select: { id: true, roleTitle: true, companyName: true, appliedAt: true } }),
+        prisma.recruiter.findMany({ where: { userId, status: { in: ['NEW', 'CONTACTED', 'RESPONDED'] }, OR: [{ lastContactAt: { lt: new Date(now.getTime() - 14 * 86_400_000) } }, { lastContactAt: null }] }, orderBy: { updatedAt: 'asc' }, take: 5, select: { id: true, name: true, lastContactAt: true } }),
+        prisma.reminder.findMany({ where: { userId, done: false }, orderBy: { dueAt: 'asc' }, take: 5, select: { id: true, title: true, dueAt: true } }),
+        prisma.application.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 5, select: { id: true, roleTitle: true, companyName: true, status: true, appliedAt: true } }),
+        prisma.job.findMany({ where: { userId, fitScore: { not: null } }, orderBy: { fitScore: 'desc' }, take: 3, select: { id: true, title: true, fitScore: true, company: { select: { name: true } } } }),
+        prisma.application.count({ where: { userId, appliedAt: { gte: new Date(now.getTime() - 7 * 86_400_000) } } }),
+        prisma.interview.count({ where: { userId, status: 'SCHEDULED', scheduledAt: { gte: now, lte: new Date(now.getTime() + 7 * 86_400_000) } } }),
       ]);
 
     const countBy = <T extends string>(rows: { status: T; _count: number }[]): Record<T, number> =>
@@ -76,7 +83,14 @@ export class DashboardService {
         })),
         completed: completedInterviews,
       },
-      reminders: { overdue, dueNext48h: dueSoon },
+      reminders: { overdue, dueNext48h: dueSoon, items: reminderItems },
+      attention: {
+        staleApplications: staleApps.map((a) => ({ id: a.id, roleTitle: a.roleTitle, companyName: a.companyName, appliedAt: a.appliedAt, waitingDays: a.appliedAt ? Math.floor((now.getTime() - a.appliedAt.getTime()) / 86_400_000) : 0 })),
+        staleRecruiters: staleRecs,
+      },
+      momentum: { appsThisWeek, interviewsNext7, messagesLast7Days: messages },
+      recentApplications: recentApps,
+      topJobs: topJobsRows.map((j) => ({ id: j.id, title: j.title, companyName: j.company?.name ?? null, fitScore: j.fitScore ?? 0 })),
       analytics: await this.computeAnalytics(userId),
     };
   }

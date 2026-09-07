@@ -11,22 +11,30 @@ function formatMoney(amount: number | null, currency: string): string | null {
   return `${currency} ${amount.toLocaleString()}`;
 }
 
-/** Compact 30-day application trend as lightweight bars. */
+/** 30-day trend with total + peak highlight. */
 function TrendBars({ data }: { data: DashboardStats['analytics']['applicationsTrend'] }) {
   const max = Math.max(1, ...data.map((d) => d.count));
+  const total = data.reduce((s, d) => s + d.count, 0);
   return (
-    <div className="flex h-16 items-end gap-[3px]">
-      {data.map((d) => {
-        const h = Math.round((d.count / max) * 100);
-        return (
-          <div key={d.date} className="group relative flex-1" title={`${d.date}: ${d.count}`}>
-            <div
-              className="w-full rounded-t-sm bg-accent/70 transition-colors group-hover:bg-accent"
-              style={{ height: `${Math.max(d.count ? h : 2, 2)}%` }}
-            />
-          </div>
-        );
-      })}
+    <div>
+      <div className="mb-2 flex items-baseline justify-between">
+        <p className="font-mono text-lg leading-none text-text">{total}</p>
+        <p className="text-[11px] text-text-muted">peak {max}/day</p>
+      </div>
+      <div className="flex h-16 items-end gap-[3px]" role="img" aria-label={`${total} applications in last 30 days`}>
+        {data.map((d) => {
+          const h = Math.round((d.count / max) * 100);
+          const isPeak = d.count === max && max > 0;
+          return (
+            <div key={d.date} className="group relative flex-1" title={`${d.date}: ${d.count}`}>
+              <div
+                className={isPeak ? 'w-full rounded-t-sm bg-accent transition-colors group-hover:bg-accent-strong' : 'w-full rounded-t-sm bg-accent/50 transition-colors group-hover:bg-accent'}
+                style={{ height: `${Math.max(d.count ? h : 4, 4)}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -51,16 +59,22 @@ export function CommandCenter({ analytics }: { analytics: DashboardStats['analyt
           <CardTitle>{t('analytics.funnel.title')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="grid grid-cols-4 gap-2">
-            {funnel.map((stage) => (
-              <div key={stage.label} className="rounded-[var(--radius-control)] border border-border px-2 py-2 text-center">
-                <p className="inline-block rounded-sm px-1.5 font-mono text-lg leading-none text-text" style={{ background: 'transparent' }}>
-                  {stage.value}
-                </p>
-                <span className={`mx-auto block h-1 w-7 rounded-full ${stage.color}`} />
-                <p className="mt-1.5 text-[10.5px] text-text-muted">{stage.label}</p>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {funnel.map((stage, idx) => {
+              const prev = idx === 0 ? null : funnel[idx - 1].value;
+              const conv = prev && prev > 0 ? Math.round((stage.value / prev) * 100) : null;
+              const pct = funnel[0].value > 0 ? Math.max(8, Math.round((stage.value / Math.max(1, funnel[0].value)) * 100)) : 8;
+              return (
+                <div key={stage.label} className="rounded-[var(--radius-control)] border border-border px-2 py-2 text-center">
+                  <p className="font-mono text-lg leading-none text-text">{stage.value}</p>
+                  <div className="mx-auto mt-2 h-1 w-full max-w-[64px] overflow-hidden rounded-full bg-surface-3">
+                    <div className={`h-full rounded-full ${stage.color}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="mt-1.5 text-[10.5px] text-text-muted">{stage.label}</p>
+                  {conv != null ? <p className="font-mono text-[10px] text-accent">{conv}%</p> : null}
+                </div>
+              );
+            })}
           </div>
 
           <div>
