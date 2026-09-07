@@ -39,9 +39,7 @@ export class InterviewService {
     const { userId, orgId } = normalizeScope(scopeInput);
     const interview = await this.repo.create(scopeInput, data);
     await this.syncLinkedStatus(scopeInput, interview);
-    await notificationService.create({
-      userId,
-      orgId: orgId || null,
+    await notificationService.createForMembers(scopeInput, {
       type: 'INTERVIEW',
       title: `Interview scheduled: ${interview.title}`,
       body: interview.companyName ?? undefined,
@@ -66,9 +64,7 @@ export class InterviewService {
       await this.syncLinkedStatus(scopeInput, result);
     }
     if (result.status === 'COMPLETED' && current.status !== 'COMPLETED') {
-      await notificationService.create({
-        userId,
-        orgId: orgId || null,
+      await notificationService.createForMembers(scopeInput, {
         type: 'SYSTEM',
         title: `Interview completed: ${result.title}`,
         body: 'Log the outcome while it is fresh.',
