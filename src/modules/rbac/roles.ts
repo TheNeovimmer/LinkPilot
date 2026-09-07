@@ -33,3 +33,15 @@ export function can(action: RbacAction, role: OrgRole | null | undefined): boole
 export function normalizeRole(role: unknown, fallback: OrgRole = 'MEMBER'): OrgRole {
   return isOrgRole(role) ? role : fallback;
 }
+
+/** Only OWNERs may grant, change, or remove other OWNERs. ADMINs manage MEMBER/VIEWER/ADMIN. */
+export function canManageOwners(actor: OrgRole): boolean {
+  return actor === 'OWNER';
+}
+
+/** HTTP verbs that mutate state (RBAC write gate). */
+export const WRITE_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
+
+export function isWriteMethod(method: string): boolean {
+  return WRITE_METHODS.has(method.toUpperCase());
+}
