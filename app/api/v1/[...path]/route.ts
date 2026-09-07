@@ -382,19 +382,21 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
     case 'companies':
       return handleCompanies(req, m, path, user);
     case 'conversations': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const cid = rest[0];
       if (cid && rest[1] === 'messages') return handleMessages(req, m, rest.slice(2), user, cid);
       if (m === 'GET' && !cid) {
-        const r = await conversationService.list(user.id, queryOf(req, conversationQuerySchema));
+        const r = await conversationService.list(scope, queryOf(req, conversationQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !cid) return created(await asServiceInput<Parameters<typeof conversationService.create>[1]>(createConversationSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !cid) return created(await conversationService.create(scope, asServiceInput<Parameters<typeof conversationService.create>[1]>(createConversationSchema.parse(await parseBody(req)))));
       if (cid) {
         conversationIdSchema.parse({ id: cid });
-        if (m === 'GET') return ok(await conversationService.get(user.id, cid));
-        if (m === 'PATCH') return ok(await conversationService.update(user.id, cid, updateConversationSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await conversationService.get(scope, cid));
+        if (m === 'PATCH') return ok(await conversationService.update(scope, cid, updateConversationSchema.parse(await parseBody(req))));
         if (m === 'DELETE') {
-          await conversationService.remove(user.id, cid);
+          await conversationService.remove(scope, cid);
           return noContent();
         }
       }
