@@ -420,36 +420,38 @@ async function dispatch(req: Request, path: string[], user: AuthUser): Promise<R
       throw new Error('Not found: recruiters');
     }
     case 'jobs': {
+      const { resolveDataScope } = await import('@/server/scope');
+      const scope = await resolveDataScope(req, user);
       const id = rest[0];
-      if (m === 'GET' && id === 'stats') return ok(await jobService.stats(user.id));
-      if (m === 'POST' && id === 'import') return created(await jobService.importFromText(user.id, importJobSchema.parse(await parseBody(req)).text));
+      if (m === 'GET' && id === 'stats') return ok(await jobService.stats(scope));
+      if (m === 'POST' && id === 'import') return created(await jobService.importFromText(scope, importJobSchema.parse(await parseBody(req)).text));
       if (m === 'PATCH' && id === 'bulk') {
         const body = bulkUpdateJobSchema.parse(await parseBody(req));
-        return ok({ updated: await jobService.bulkUpdate(user.id, body.ids, body.status) });
+        return ok({ updated: await jobService.bulkUpdate(scope, body.ids, body.status) });
       }
       if (m === 'POST' && id === 'semantic') {
         const body = semanticSearchSchema.parse(await parseBody(req));
         const client = await getAiClient(user.id);
         try {
           const embedding = await client.embed(body.q);
-          return ok({ items: await jobService.semanticSearch(user.id, embedding, body.limit ?? 10), mode: 'semantic' });
+          return ok({ items: await jobService.semanticSearch(scope, embedding, body.limit ?? 10), mode: 'semantic' });
         } catch {
           // No embedding model / vector op unavailable → text search fallback.
-          const result = await jobService.list(user.id, { q: body.q, limit: body.limit ?? 10, page: 1 } as never);
+          const result = await jobService.list(scope, { q: body.q, limit: body.limit ?? 10, page: 1 } as never);
           return ok({ items: result.items, mode: 'text' });
         }
       }
       if (m === 'GET' && !id) {
-        const r = await jobService.list(user.id, queryOf(req, jobQuerySchema));
+        const r = await jobService.list(scope, queryOf(req, jobQuerySchema));
         return ok(r.items, (r as unknown as { meta: unknown }).meta as never);
       }
-      if (m === 'POST' && !id) return created(await asServiceInput<Parameters<typeof jobService.create>[1]>(createJobSchema.parse(await parseBody(req))));
+      if (m === 'POST' && !id) return created(await jobService.create(scope, asServiceInput<Parameters<typeof jobService.create>[1]>(createJobSchema.parse(await parseBody(req)))));
       if (id) {
         jobIdSchema.parse({ id });
-        if (m === 'GET') return ok(await jobService.get(user.id, id));
-        if (m === 'PATCH') return ok(await asServiceInput<Parameters<typeof jobService.update>[2]>(updateJobSchema.parse(await parseBody(req))));
+        if (m === 'GET') return ok(await jobService.get(scope, id));
+        if (m === 'PATCH') return ok(await jobService.update(scope, id, asServiceInput<Parameters<typeof jobService.update>[2]>(updateJobSchema.parse(await parseBody(req)))));
         if (m === 'DELETE') {
-          await jobService.remove(user.id, id);
+          await jobService.remove(scope, id);
           return noContent();
         }
       }
