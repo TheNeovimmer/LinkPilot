@@ -79,11 +79,13 @@ npm install
 Create a `.env.local` at the project root:
 
 ```env
-# Database (PostgreSQL)
+# Database (PostgreSQL + pgvector). Local dev:
 DATABASE_URL="postgresql://user:password@localhost:5432/linkpilot?schema=public"
+# Neon pooled (prod) — single `=`, no channel_binding:
+# DATABASE_URL="postgresql://USER:PASSWORD@HOST-pooler.REGION.aws.neon.tech/DATABASE?sslmode=require&pgbouncer=true&connection_limit=1"
 
-# Better Auth
-BETTER_AUTH_SECRET="a-long-random-string"
+# Better Auth — 32+ chars, never commit real values
+BETTER_AUTH_SECRET="openssl-rand-base64-32-here-min-32-chars"
 BETTER_AUTH_URL="http://localhost:3000"
 
 # AI (optional — can also be set per-user from Settings → AI provider)
@@ -266,12 +268,13 @@ Workspace rows are shared (`orgId`), pre-RBAC rows stay `orgId = null` and remai
 
 1. Push to GitHub
 2. Import the repo on [vercel.com](https://vercel.com)
-3. Set the environment variables in the Vercel dashboard (see above)
-4. Add a PostgreSQL database (e.g. Neon) and set `DATABASE_URL`
-5. Run `npm run db:deploy` against the production database (or in a build step) so the Prisma migrations apply
-6. Deploy — Vercel runs `prisma generate` automatically via `postinstall`
+3. Settings → Env (Production):
+   `BETTER_AUTH_URL=https://<app>.vercel.app` (no slash), `BETTER_AUTH_SECRET` (openssl 32+), `DATABASE_URL` Neon pooled `?sslmode=require&pgbouncer=true&connection_limit=1` (single `=`, no `channel_binding`)
+4. Neon → unpause branch, `CREATE EXTENSION IF NOT EXISTS vector`, run `npx prisma migrate deploy` against prod DB
+5. Redeploy — Vercel runs `prisma generate` via `postinstall`
+6. Verify `GET /api/health` is `{status:ok}` and logged-out `GET /api/v1/auth/session` is `200 {success:true,data:null}`
 
-> Notes for Vercel: uploads live in PostgreSQL so the ephemeral serverless filesystem is fine. The **service worker (PWA) only registers in production builds**.
+> Notes for Vercel: uploads live in PostgreSQL so the ephemeral FS is fine (logger is console-only, workers off, auth `nodejs` + `force-dynamic`). The **service worker (PWA) only registers in production builds**.
 
 ### Self-hosted
 
@@ -287,7 +290,7 @@ npm run start        # no persistent volume needed for files (DB-backed)
 - [ ] `DATABASE_URL` points at a Postgres instance with pgvector
 - [ ] Database is backed up (uploads live in Postgres)
 - [ ] Migrations applied (`npm run db:deploy`)
-- [ ] `db:seed` NOT run in production (dev-only sample data)
+- [ ] `db:seed` NEVER in production (dev-only, requires `SEED_EMAIL` + `SEED_PASSWORD` env, refuses prod)
 - [ ] Optional: enable **2FA** for the account from Settings
 
 ---

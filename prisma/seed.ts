@@ -1,15 +1,20 @@
 /**
- * Idempotent seed: creates the demo user (via Better Auth so passwords hash
- * correctly) and a realistic dataset. Safe to re-run.
+ * Idempotent DEV-ONLY seed: creates a demo user (via Better Auth so passwords hash
+ * correctly) and a realistic dataset. Safe to re-run. Never run in production.
  *
- *   npm run db:seed -w backend
+ *   SEED_EMAIL='you@company.com' SEED_PASSWORD='<strong-secret>' npm run db:seed
  */
 import { auth } from '../src/modules/auth/auth.js';
 import { prisma } from '../src/database/prisma.js';
 import { logger } from '../src/utils/logger.js';
 
 const SEED_EMAIL = process.env.SEED_EMAIL ?? 'demo@linkpilot.app';
-const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'linkpilot-demo-1234';
+function seedPassword(): string {
+  if (process.env.NODE_ENV === 'production') throw new Error('Refusing to seed in production');
+  const p = process.env.SEED_PASSWORD;
+  if (!p) throw new Error('Refusing to seed without SEED_PASSWORD (dev-only, never commit it)');
+  return p;
+}
 
 async function ensureUser(): Promise<string> {
   const existing = await prisma.user.findUnique({ where: { email: SEED_EMAIL } });
@@ -18,7 +23,7 @@ async function ensureUser(): Promise<string> {
   const signedUp = await auth.api.signUpEmail({
     body: {
       email: SEED_EMAIL,
-      password: SEED_PASSWORD,
+      password: seedPassword(),
       name: 'Alex Rivera',
     },
   });
@@ -185,9 +190,8 @@ async function main(): Promise<void> {
     update: { userId },
   });
 
-  logger.info('✅ Seed complete. Login with:');
+  logger.info('✅ Seed complete.');
   logger.info(`   email:    ${SEED_EMAIL}`);
-  logger.info(`   password: ${SEED_PASSWORD}`);
 }
 
 main()
