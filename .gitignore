@@ -11,8 +11,7 @@ build/
 .env.local
 .env.*.local
 
-# data / uploads  (runtime dir at repo root — NOT app/uploads source route)
-/uploads/
+# data
 *.sqlite
 *.db
 

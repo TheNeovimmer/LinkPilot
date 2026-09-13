@@ -22,7 +22,7 @@ model User {
   email            String       @unique
   emailVerified    Boolean      @default(false)
   image            String?
-  /// Avatar bytes in the database. Null = legacy file under UPLOAD_DIR.
+  /// Avatar bytes in the database.
   avatarData       Bytes?
   avatarMime       String?
   twoFactorEnabled Boolean      @default(false)
@@ -387,7 +387,7 @@ model Attachment {
   mimeType      String
   size          Int
   url           String
-  /// File bytes in the database (replaces UPLOAD_DIR on disk). Null = legacy row, migrate via scripts/migrate-uploads-to-db.ts.
+  /// File bytes in the database.
   data          Bytes?
   createdAt     DateTime     @default(now())
 

@@ -72,9 +72,7 @@ export class AttachmentService {
     const { userId, orgId } = normalizeScope(scopeInput);
     const attachment = await this.repo.remove(scopeInput, id);
     if (!attachment) throw ApiError.notFound('Attachment not found');
-    // Legacy filesystem cleanup for pre-DB rows (never throws on IO errors).
-    const { removeUpload } = await import('@/lib/storage');
-    removeUpload(attachment.url);
+    // ponytail: DB row delete = file delete, no filesystem.
     await auditService.log(userId, 'attachment.delete', 'attachment', id, undefined, undefined, orgId || undefined);
   }
 }

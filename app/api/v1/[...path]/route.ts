@@ -195,8 +195,6 @@ async function handleUsers(req: Request, method: string, path: string[], user: A
 async function handleAvatar(req: Request, user: AuthUser): Promise<Response> {
   const { default: crypto } = await import('node:crypto');
   const { extname } = await import('node:path');
-  const { default: multer } = await import('multer');
-  const { removeUpload } = await import('@/lib/storage');
   const { ApiError } = await import('@/utils/ApiError');
 
   const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
@@ -212,14 +210,8 @@ async function handleAvatar(req: Request, user: AuthUser): Promise<Response> {
   const filename = `${crypto.randomUUID()}${ext}`;
 
   const url = `/uploads/${filename}`;
-  const before = await userService.getProfile(user.id).catch(() => null);
+  // ponytail: bytes live in User.avatarData, no filesystem.
   const profile = await userService.updateAvatar(user.id, url, { data: buf, mime: file.type });
-  if (before?.image && before.image !== url) {
-    // Legacy on-disk avatar from before database storage (best-effort, never throws).
-    removeUpload(before.image);
-  }
-  // static serving handled by route/rewrite — placeholder for uploads URL
-  void multer;
   return ok(profile);
 }
 
@@ -242,12 +234,13 @@ async function handleAttachments(req: Request, m: string, id: string | undefined
     const { extname } = await import('node:path');
     const { isAttachmentKind } = await import('@/modules/attachments/types');
 
-    const MAX_SIZE = 20 * 1024 * 1024; // 20 MB
+    const MAX_SIZE = 10 * 1024 * 1024; // ponytail: 10MB cap keeps Postgres rows sane
+
     const form = await req.formData();
     const file = form.get('file');
     if (!(file instanceof File)) throw ApiError.badRequest('No file uploaded');
     if (file.size < 1) throw ApiError.badRequest('Empty file');
-    if (file.size > MAX_SIZE) throw ApiError.badRequest('File exceeds 20MB');
+    if (file.size > MAX_SIZE) throw ApiError.badRequest('File exceeds 10MB');
 
     const applicationId = (form.get('applicationId') as string | null) ?? null;
     const noteId = (form.get('noteId') as string | null) ?? null;
