@@ -123,26 +123,9 @@ LinkPilot is a multi-workspace SaaS. Every account gets a personal workspace on 
 | ADMIN | yes | yes | yes | yes | no |
 | OWNER | yes | yes | yes | yes | yes |
 
-Only OWNERs may grant, demote, or remove other OWNERs, and the last OWNER cannot be demoted or removed. Platform administration (`/admin`, all workspaces and users) requires `SUPER_ADMIN`, enforced server-side:
-
-```bash
-npx tsx scripts/promote-admin.ts --list
-npx tsx scripts/promote-admin.ts you@company.com
-```
+Only OWNERs may grant, demote, or remove other OWNERs, and the last OWNER cannot be demoted or removed.
 
 Invite links look like `/workspaces?token=...` and auto-accept on open when signed in with the invited email. Invite emails are not sent yet — copy the link from the UI. Your pending invites also live in-app under **Workspaces → Pending invites for you** (`GET /api/v1/organizations/invites/mine`).
-
-### Super-admin dashboard access
-
-1. Promote your account (server-side, needs DB access):
-
-```bash
-npx tsx scripts/promote-admin.ts --list
-npx tsx scripts/promote-admin.ts you@company.com
-```
-
-2. Sign out and back in so the session picks up `platformRole: SUPER_ADMIN`.
-3. The sidebar shows **Admin** (`/admin`); the API gate is `requireSuperAdmin` plus `GET /api/v1/auth/session` returning the role. Without the role the link is hidden and the API returns 403.
 
 ### Uploads are stored in the database
 
@@ -169,7 +152,6 @@ Workspace rows are shared (`orgId`), pre-RBAC rows stay `orgId = null` and remai
 | `npm run db:generate` | Regenerate Prisma client |
 | `npm run db:migrate` | Run Prisma migrations (dev) |
 | `npm run db:deploy` | Deploy migrations (production) |
-| `npm run db:seed` | Seed dev-only sample data — **do not run in production** |
 | `npm run db:studio` | Open Prisma Studio |
 
 ---
@@ -238,7 +220,6 @@ Workspace rows are shared (`orgId`), pre-RBAC rows stay `orgId = null` and remai
 │   └── views/                    # Page-level view components
 ├── prisma/
 │   ├── schema.prisma             # Database schema (PostgreSQL + pgvector)
-│   ├── seed.ts                   # Idempotent demo seed
 │   └── migrations/
 ├── public/                       # Static assets
 ├── logs/                         # Server logs (gitignored)
@@ -259,39 +240,6 @@ Workspace rows are shared (`orgId`), pre-RBAC rows stay `orgId = null` and remai
 - **2FA** — TOTP two-factor via the Better Auth `twoFactor` plugin (secret + recovery back-up codes). Enforced at sign-in and toggleable from Settings.
 - **pgvector** — the `Job` model supports vector embeddings for semantic search.
 - **No Redis** — all server state lives in PostgreSQL (sessions, rate limiting via Better Auth).
-
----
-
-## Deployment
-
-### Vercel (recommended)
-
-1. Push to GitHub
-2. Import the repo on [vercel.com](https://vercel.com)
-3. Settings → Env (Production):
-   `BETTER_AUTH_URL=https://<app>.vercel.app` (no slash), `BETTER_AUTH_SECRET` (openssl 32+), `DATABASE_URL` Neon pooled `?sslmode=require&pgbouncer=true&connection_limit=1` (single `=`, no `channel_binding`)
-4. Neon → unpause branch, `CREATE EXTENSION IF NOT EXISTS vector`, run `npx prisma migrate deploy` against prod DB
-5. Redeploy — Vercel runs `prisma generate` via `postinstall`
-6. Verify `GET /api/health` is `{status:ok}` and logged-out `GET /api/v1/auth/session` is `200 {success:true,data:null}`
-
-> Notes for Vercel: uploads live in PostgreSQL so the ephemeral FS is fine (logger is console-only, workers off, auth `nodejs` + `force-dynamic`). The **service worker (PWA) only registers in production builds**.
-
-### Self-hosted
-
-```bash
-npm run build
-npm run db:deploy    # run migrations against production DB
-npm run start        # no persistent volume needed for files (DB-backed)
-```
-
-### Production checklist
-
-- [ ] `NODE_ENV=production`, strong `BETTER_AUTH_SECRET`, HTTPS
-- [ ] `DATABASE_URL` points at a Postgres instance with pgvector
-- [ ] Database is backed up (uploads live in Postgres)
-- [ ] Migrations applied (`npm run db:deploy`)
-- [ ] `db:seed` NEVER in production (dev-only, requires `SEED_EMAIL` + `SEED_PASSWORD` env, refuses prod)
-- [ ] Optional: enable **2FA** for the account from Settings
 
 ---
 
