@@ -20,7 +20,7 @@ export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   emailAndPassword: {
     enabled: true,
-    minPasswordLength: 8,
+    minPasswordLength: 12,
   },
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days

@@ -47,8 +47,8 @@ if (env.NODE_ENV === 'production') {
   if (env.BETTER_AUTH_SECRET.includes('change-me') || env.BETTER_AUTH_SECRET.length < 32)
     problems.push('BETTER_AUTH_SECRET must be a real 32+ char secret');
   if (problems.length > 0) {
-    // eslint-disable-next-line no-console
-    console.error('❌ Invalid production env:', problems.join('; '));
+    // ponytail: fail-closed in prod — never boot with localhost/placeholder/short secret.
+    throw new Error(`Invalid production env: ${problems.join('; ')}`);
   }
 }
 

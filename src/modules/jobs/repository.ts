@@ -140,6 +140,7 @@ export class JobRepository {
 
   /** Persist an embedding for semantic search (optional feature). */
   async updateEmbedding(id: string, embedding: number[]): Promise<void> {
+    if (!Array.isArray(embedding) || embedding.length === 0 || embedding.length > 4096 || !embedding.every((n) => Number.isFinite(n))) throw new Error('Invalid embedding');
     await prisma.$executeRawUnsafe(
       'UPDATE "Job" SET embedding = $1::vector WHERE id = $2',
       `[${embedding.join(',')}]`,
@@ -149,6 +150,8 @@ export class JobRepository {
 
   /** pgvector semantic search; falls back to caller if vector ops unavailable. */
   async semanticSearch(scopeInput: ScopeInput, embedding: number[], limit: number): Promise<JobDTO[]> {
+    if (!Array.isArray(embedding) || embedding.length === 0 || embedding.length > 4096 || !embedding.every((n) => Number.isFinite(n))) throw new Error('Invalid embedding');
+    const safeLimit = Math.min(Math.max(Math.floor(limit) || 10, 1), 50);
     const scope = normalizeScope(scopeInput);
     const vector = `[${embedding.join(',')}]`;
     // Two explicit shapes instead of a sentinel: personal scope sees legacy
@@ -165,7 +168,7 @@ export class JobRepository {
           scope.orgId,
           scope.userId,
           vector,
-          limit,
+          safeLimit,
         )
       : await prisma.$queryRawUnsafe<JobRow[]>(
           `SELECT j.*, c.name AS "companyName",
@@ -177,7 +180,7 @@ export class JobRepository {
        LIMIT $3`,
           scope.userId,
           vector,
-          limit,
+          safeLimit,
         );
     return rows.map(mapJob);
   }
