@@ -23,8 +23,8 @@ api.interceptors.response.use(
   (err) => {
     const status = err.response?.status as number | undefined;
     const url = err.config?.url as string | undefined;
-    // Expired/invalid session → back to login (except when already logging in).
-    if (status === 401 && url && !url.includes('/auth/')) {
+    // Expired/invalid session → back to login (never redirect when already there — that reload-loops /login).
+    if (status === 401 && url && !url.includes('/auth/') && window.location.pathname !== '/login') {
       window.location.assign('/login');
     }
     return Promise.reject(err);
@@ -62,8 +62,9 @@ export interface SessionUser {
 
 export async function getSession(): Promise<SessionUser | null> {
   const res = await fetch('/api/v1/auth/session', { credentials: 'include' });
-  const json = (await res.json()) as { success: boolean; data: { user: SessionUser } | null };
-  return json.success ? (json.data?.user ?? null) : null;
+  if (res.status === 401) return null;
+  const json = (await res.json().catch(() => null)) as { success: boolean; data: { user: SessionUser } | null } | null;
+  return json?.success ? (json.data?.user ?? null) : null;
 }
 
 export interface SignInResult {

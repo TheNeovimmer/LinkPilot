@@ -24,7 +24,10 @@ function Boot() {
   const preferencesInit = usePreferences((s) => s.init);
 
   useEffect(() => {
-    void initSession().then(() => void useOrg.getState().init());
+    void initSession().then(() => {
+      // ponytail: skip org fetch when logged out — avoids 401 → redirect → reload loop on /login.
+      if (useSession.getState().user) void useOrg.getState().init();
+    });
     themeInit();
     localeInit();
     preferencesInit();

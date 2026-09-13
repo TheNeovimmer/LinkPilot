@@ -1,4 +1,4 @@
-import { handle, requireUser, requireOrg, requireSuperAdmin, isSuperAdmin, ok, created, noContent, rawJson, sseResponse, type AuthUser } from '@/server/http';
+import { handle, getUser, requireUser, requireOrg, requireSuperAdmin, isSuperAdmin, ok, created, noContent, rawJson, sseResponse, type AuthUser } from '@/server/http';
 import { organizationService } from '@/modules/organizations/service';
 import { createOrgSchema, updateOrgSchema, inviteSchema, updateMemberRoleSchema } from '@/modules/organizations/schema';
 import { normalizeRole } from '@/modules/rbac/roles';
@@ -161,7 +161,8 @@ function asServiceInput<T>(value: unknown): T {
 
 // ---- module handlers --------------------------------------------------------
 
-async function handleAuth(req: Request, user: AuthUser): Promise<Response> {
+async function handleAuth(req: Request, user: AuthUser | null): Promise<Response> {
+  if (!user) return ok(null);
   const { auth } = await import('@/modules/auth/auth');
   const { prisma } = await import('@/database/prisma');
   const session = await auth.api.getSession({ headers: req.headers });
@@ -312,43 +313,49 @@ function isId(x: string | undefined): boolean {
 
 // ---- the main route handler ------------------------------------------------
 
+async function resolveUser(req: Request, path: string[]): Promise<AuthUser | null> {
+  // ponytail: auth/* stays nullable so logged-out session returns 200 null, not 401.
+  if (path[0] === 'auth') return getUser(req);
+  return requireUser(req);
+}
+
 export async function GET(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   return handle(async () => {
     const { path } = await ctx.params;
-    const user = await requireUser(req);
-    return dispatch(req, path, user);
+    return dispatch(req, path, await resolveUser(req, path));
   });
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   return handle(async () => {
     const { path } = await ctx.params;
-    const user = await requireUser(req);
-    return dispatch(req, path, user);
+    return dispatch(req, path, await resolveUser(req, path));
   });
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   return handle(async () => {
     const { path } = await ctx.params;
-    const user = await requireUser(req);
-    return dispatch(req, path, user);
+    return dispatch(req, path, await resolveUser(req, path));
   });
 }
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   return handle(async () => {
     const { path } = await ctx.params;
-    const user = await requireUser(req);
-    return dispatch(req, path, user);
+    return dispatch(req, path, await resolveUser(req, path));
   });
 }
 
 const method = (req: Request) => req.method;
 
-async function dispatch(req: Request, path: string[], user: AuthUser): Promise<Response> {
+async function dispatch(req: Request, path: string[], user: AuthUser | null): Promise<Response> {
   const m = method(req);
   const [resource, ...rest] = path;
+  if (!user) {
+    if (resource !== 'auth') throw (await import('@/utils/ApiError')).ApiError.unauthorized();
+    return handleAuth(req, null);
+  }
 
   const { minRoleFor, minRoleForAi } = await import('@/server/guards');
   const domainMin = minRoleFor(resource, m);
