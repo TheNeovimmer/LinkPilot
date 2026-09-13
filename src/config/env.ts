@@ -38,7 +38,8 @@ const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   // eslint-disable-next-line no-console
   console.error('❌ Invalid environment variables:', parsed.error.flatten().fieldErrors);
-  process.exit(1);
+  // ponytail: never process.exit on Vercel — it turns every route into empty 500. Throw instead.
+  throw new Error('Invalid environment variables');
 }
 
 export const env = parsed.data;
