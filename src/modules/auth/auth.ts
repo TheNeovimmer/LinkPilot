@@ -8,10 +8,15 @@ import { env } from '../../config/env';
  * Better Auth instance (email/password). Handles sign-up, sign-in, sessions
  * and issues JWT-signed session tokens. Mounted at /api/auth via expressPlugin.
  */
+const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL ?? null;
+const vercelOrigin = vercelHost ? `https://${vercelHost}` : null;
+// ponytail: dev works (localhost default) but prod 500s when BETTER_AUTH_URL is unset — fall back to Vercel URL.
+const baseURL = !env.BETTER_AUTH_URL.includes('localhost') ? env.BETTER_AUTH_URL : (vercelOrigin ?? env.BETTER_AUTH_URL);
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
-  baseURL: env.BETTER_AUTH_URL,
-  trustedOrigins: [env.BETTER_AUTH_URL, ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : [])],
+  baseURL,
+  trustedOrigins: [baseURL, ...(vercelOrigin && vercelOrigin !== baseURL ? [vercelOrigin] : [])],
   secret: env.BETTER_AUTH_SECRET,
   emailAndPassword: {
     enabled: true,
