@@ -11,6 +11,7 @@ import { env } from '../../config/env';
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
   baseURL: env.BETTER_AUTH_URL,
+  trustedOrigins: [env.BETTER_AUTH_URL, ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : [])],
   secret: env.BETTER_AUTH_SECRET,
   emailAndPassword: {
     enabled: true,
@@ -22,9 +23,11 @@ export const auth = betterAuth({
   },
   advanced: {
     cookiePrefix: 'linkpilot',
+    useSecureCookies: process.env.NODE_ENV === 'production',
     defaultCookieAttributes: {
       sameSite: 'lax',
       httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
     },
   },
   rateLimit: {

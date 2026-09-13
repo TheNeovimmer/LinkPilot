@@ -163,12 +163,16 @@ function asServiceInput<T>(value: unknown): T {
 
 async function handleAuth(req: Request, user: AuthUser | null): Promise<Response> {
   if (!user) return ok(null);
-  const { auth } = await import('@/modules/auth/auth');
-  const { prisma } = await import('@/database/prisma');
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) return ok(null);
-  const row = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
-  return ok({ user: { ...session.user, platformRole: row?.platformRole ?? 'USER' } });
+  // ponytail: reuse the already-resolved user; role lookup degrades to USER on DB hiccup.
+  try {
+    const { prisma } = await import('@/database/prisma');
+    const row = await prisma.user.findUnique({ where: { id: user.id }, select: { platformRole: true } });
+    return ok({ user: { ...user, platformRole: row?.platformRole ?? 'USER' } });
+  } catch (err) {
+    const { logger } = await import('@/utils/logger');
+    logger.warn('handleAuth role lookup failed, falling back to USER', err);
+    return ok({ user: { ...user, platformRole: 'USER' } });
+  }
 }
 
 async function handleUsers(req: Request, method: string, path: string[], user: AuthUser): Promise<Response> {

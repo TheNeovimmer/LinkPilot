@@ -42,4 +42,19 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+// Prod misconfig must not crash the serverless instance (process.exit = HTML /500 on Vercel).
+// Log once; auth/DB calls will surface the real error in Runtime Logs.
+if (env.NODE_ENV === 'production') {
+  const problems: string[] = [];
+  if (env.BETTER_AUTH_URL.includes('localhost')) problems.push('BETTER_AUTH_URL must be the public https URL (e.g. https://thelink-pilot.vercel.app)');
+  if (env.DATABASE_URL.includes('USER:PASSWORD@HOST')) problems.push('DATABASE_URL is a placeholder');
+  if (env.BETTER_AUTH_SECRET.includes('change-me') || env.BETTER_AUTH_SECRET.length < 32)
+    problems.push('BETTER_AUTH_SECRET must be a real 32+ char secret');
+  if (problems.length > 0) {
+    // eslint-disable-next-line no-console
+    console.error('❌ Invalid production env:', problems.join('; '));
+  }
+}
+
 export type Env = typeof env;

@@ -11,9 +11,15 @@ export interface AuthUser {
   image?: string | null;
 }
 
-/** Resolve the current session user (or null). */
+/** Resolve the current session user (or null). Never throws — DB hiccups degrade to logged-out. */
 export async function getUser(req: Request): Promise<AuthUser | null> {
-  const session = await auth.api.getSession({ headers: req.headers });
+  let session;
+  try {
+    session = await auth.api.getSession({ headers: req.headers });
+  } catch (err) {
+    logger.warn('getSession failed, treating as logged-out', err);
+    return null;
+  }
   if (!session?.user) return null;
   return {
     id: session.user.id,
